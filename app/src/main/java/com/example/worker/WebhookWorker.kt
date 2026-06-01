@@ -35,56 +35,111 @@ class WebhookWorker(
         var exceptionMsg = ""
 
         try {
-            val url = URL(urlString)
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "POST"
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.setRequestProperty("Accept", "application/json")
-            connection.setRequestProperty("User-Agent", "SmsForwarder/1.0")
-            connection.connectTimeout = timeout
-            connection.readTimeout = timeout
-            connection.doOutput = true
-
-            var finalMessage = message
-            if (settings.aesEncryptionKey.isNotEmpty()) {
-                finalMessage = encryptAes(message, settings.aesEncryptionKey)
-            }
-
-            val jsonOutput = if (settings.customWebhookTemplate.isNotEmpty()) {
-                settings.customWebhookTemplate
-                    .replace("{sender}", JSONObject.quote(sender).removeSurrounding("\""))
-                    .replace("{message}", JSONObject.quote(finalMessage).removeSurrounding("\""))
-                    .replace("{device_model}", JSONObject.quote(deviceModel).removeSurrounding("\""))
-            } else {
-                JSONObject().apply {
-                    put("sender", sender)
-                    put("message", finalMessage)
-                    if (settings.includeDeviceModel) {
-                        put("device_model", deviceModel)
-                    }
-                    put("timestamp", System.currentTimeMillis())
-                }.toString()
-            }
-
-            if (settings.webhookSecret.isNotEmpty()) {
-                val signature = generateHmacSha256(jsonOutput, settings.webhookSecret)
-                if (signature.isNotEmpty()) {
-                    connection.setRequestProperty("X-Signature", signature)
+            success = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                var finalUrlString = urlString
+                if (!finalUrlString.startsWith("http://") && !finalUrlString.startsWith("https://")) {
+                    finalUrlString = "https://$finalUrlString"
                 }
-            }
+                val url = URL(finalUrlString)
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.setRequestProperty("Accept", "application/json")
+                connection.setRequestProperty("User-Agent", "SmsForwarder/1.0")
+                connection.connectTimeout = timeout
+                connection.readTimeout = timeout
+                connection.doOutput = true
 
-            val writer = OutputStreamWriter(connection.outputStream, Charsets.UTF_8)
-            writer.write(jsonOutput)
-            writer.flush()
-            writer.close()
+                var finalMessage = message
+                if (settings.aesEncryptionKey.isNotEmpty()) {
+                    finalMessage = encryptAes(message, settings.aesEncryptionKey)
+                }
 
-            val responseCode = connection.responseCode
-            if (responseCode in 200..299) {
-                success = true
-            } else {
-                exceptionMsg = "HTTP Error: $responseCode"
+                val jsonOutput = if (settings.customWebhookTemplate.isNotBlank()) {
+                    settings.customWebhookTemplate
+                        .replace("{sender}", JSONObject.quote(sender).removeSurrounding("\""))
+                        .replace("{message}", JSONObject.quote(finalMessage).removeSurrounding("\""))
+                        .replace("{body}", JSONObject.quote(finalMessage).removeSurrounding("\""))
+                        .replace("{device_model}", JSONObject.quote(deviceModel).removeSurrounding("\""))
+                } else {
+                    val lowerMsg = message.lowercase()
+                    val type = when {
+                        lowerMsg.contains("code") || lowerMsg.contains("otp") || lowerMsg.contains("2fa") || lowerMsg.contains("verification") || Regex(".*\\b\\d{4,8}\\b.*").matches(message) -> "otp"
+                        lowerMsg.contains("bank") || lowerMsg.contains("alert") || lowerMsg.contains("deposit") || lowerMsg.contains("payment") || lowerMsg.contains("account") || lowerMsg.contains("card") || lowerMsg.contains("debited") || lowerMsg.contains("credited") -> "bank"
+                        else -> "message"
+                    }
+                    
+                    JSONObject().apply {
+                        put("type", type)
+                        put("sender", sender)
+                        put("body", finalMessage)
+                        put("time", java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault()).format(java.util.Date(System.currentTimeMillis())))
+                        
+                        val metaObj = JSONObject()
+                        if (type == "otp") {
+                            val codeMatcher = Regex("\\b\\d{4,8}\\b|G-\\d{6}").find(message)
+                            if (codeMatcher != null) {
+                                metaObj.put("code", codeMatcher.value)
+                            }
+                        } else if (type == "bank") {
+                            if (lowerMsg.contains("deposit") || lowerMsg.contains("credited")) {
+                                metaObj.put("bank_type", "DEPOSIT")
+                            } else {
+                                metaObj.put("bank_type", "PAYMENT")
+                            }
+                            val amountMatcher = Regex("\\$?\\s*\\d+(?:,\\d{3})*(?:\\.\\d{2})?").find(message)
+                            if (amountMatcher != null) {
+                                metaObj.put("amount", amountMatcher.value.replace("$", "").trim())
+                            }
+                        }
+                        if (settings.includeDeviceModel) {
+                            metaObj.put("device_model", deviceModel)
+                        }
+                        if (metaObj.length() > 0) {
+                            put("metadata", metaObj)
+                        }
+                    }.toString().replace("\\/", "/")
+                }
+
+                if (settings.webhookSecret.isNotEmpty()) {
+                    val signature = generateHmacSha256(jsonOutput, settings.webhookSecret)
+                    if (signature.isNotEmpty()) {
+                        connection.setRequestProperty("x-hmac-signature", signature)
+                    }
+                }
+
+                val jsonBytes = jsonOutput.toByteArray(Charsets.UTF_8)
+                connection.setRequestProperty("Content-Length", jsonBytes.size.toString())
+                connection.outputStream.write(jsonBytes)
+                connection.outputStream.flush()
+                connection.outputStream.close()
+
+                val responseCode = connection.responseCode
+                var isSuccess = false
+                if (responseCode in 200..299) {
+                    isSuccess = true
+                } else {
+                    val errorStream = connection.errorStream
+                    var errorBody = errorStream?.bufferedReader()?.use { it.readText() }?.trim() ?: ""
+                    
+                    // If error is HTML (common for 404s/500s from web servers), strip it or suppress it
+                    if (errorBody.contains("<html", ignoreCase = true) || errorBody.contains("<!doctype", ignoreCase = true)) {
+                        errorBody = "Server returned HTML page instead of API response. Please check if your Webhook URL is correct."
+                    } else if (errorBody.length > 250) {
+                        errorBody = errorBody.take(250) + "..."
+                    }
+                    
+                    val statusText = when (responseCode) {
+                        404 -> "404 Not Found (Check URL)"
+                        401 -> "401 Unauthorized (Check HMAC/AES Secret)"
+                        400 -> "400 Bad Request"
+                        else -> "$responseCode"
+                    }
+                    exceptionMsg = "HTTP Error: $statusText - $errorBody\nPayload Sent: $jsonOutput"
+                }
+                connection.disconnect()
+                isSuccess
             }
-            connection.disconnect()
         } catch (e: Exception) {
             exceptionMsg = e.message ?: "Unknown Error"
         }
@@ -108,7 +163,11 @@ class WebhookWorker(
                 }
             }
         } else {
-            // Test webhook, just return success/fail based on payload, don't insert DB log (or do? User didn't say, but DB log is nice).
+            // Test webhook: insert DB log so user can see it in Logs tab.
+            val db = AppDatabase.getDatabase(applicationContext)
+            db.smsDao().insertLog(
+                SmsLog(sender = sender, message = message, ruleName = ruleName, target = urlString, status = if (success) "SUCCESS" else "FAILED: $exceptionMsg")
+            )
             return if (success) Result.success() else Result.failure(Data.Builder().putString("error", exceptionMsg).build())
         }
     }

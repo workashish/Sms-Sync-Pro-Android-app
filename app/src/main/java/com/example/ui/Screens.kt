@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -306,14 +307,33 @@ fun LogsList(viewModel: MainViewModel) {
 fun LogItem(log: SmsLog, isLast: Boolean) {
     val dateFormat = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
     val isSuccess = log.status == "SUCCESS"
+    var expanded by remember { mutableStateOf(false) }
+
     Column(
-        modifier = Modifier.fillMaxWidth().background(if (isSuccess) Color.White else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f))
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (isSuccess) Color.White else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f))
+            .clickable { expanded = !expanded }
     ) {
         Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("${log.sender} -> ${log.ruleName}", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.PurplePrimary)
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(log.message, style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.PurpleText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    log.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = com.example.ui.theme.PurpleText,
+                    maxLines = if (expanded) Int.MAX_VALUE else 1,
+                    overflow = if (expanded) TextOverflow.Clip else TextOverflow.Ellipsis
+                )
+                if (expanded && !isSuccess) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        log.status,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
             Spacer(modifier = Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.End) {
@@ -657,10 +677,10 @@ fun SettingsList(viewModel: MainViewModel) {
                                     webhookRules.forEach { rule ->
                                         val data = Data.Builder()
                                             .putString("url", rule.target)
-                                            .putString("sender", "+1234567890 (Test Webhook)")
+                                            .putString("sender", "+12345678900")
                                             .putString("message", "This is a test webhook sent from SMS Sync Pro.")
                                             .putString("ruleName", "Test: ${rule.name}")
-                                            .putBoolean("isTest", false)
+                                            .putBoolean("isTest", true)
                                             .build()
 
                                         val workRequest = OneTimeWorkRequestBuilder<WebhookWorker>()
@@ -742,13 +762,14 @@ fun SettingsList(viewModel: MainViewModel) {
                     Button(
                         onClick = {
                             val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-                            intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                            intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            context.startActivity(intent)
-                            if (context is android.app.Activity) {
-                                context.finish()
+                            if (intent != null) {
+                                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                                context.startActivity(intent)
+                                if (context is android.app.Activity) {
+                                    context.finishAffinity()
+                                }
+                                Runtime.getRuntime().exit(0)
                             }
-                            Runtime.getRuntime().exit(0)
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
