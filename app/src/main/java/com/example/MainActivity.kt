@@ -65,24 +65,22 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MyApplicationTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Box(modifier = Modifier.padding(innerPadding)) {
-                        PermissionsWrapper(
-                            onRequestPermissions = {
-                                val perms = mutableListOf(
-                                    Manifest.permission.RECEIVE_SMS,
-                                    Manifest.permission.READ_SMS,
-                                    Manifest.permission.SEND_SMS
-                                )
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    perms.add(Manifest.permission.POST_NOTIFICATIONS)
-                                }
-                                requestPermissionLauncher.launch(perms.toTypedArray())
-                            },
-                            onServiceStartRequired = { startSmsForegroundService() }
-                        ) {
-                            MainScreen(viewModel = viewModel)
-                        }
+                Box(modifier = Modifier.fillMaxSize()) {
+                    PermissionsWrapper(
+                        onRequestPermissions = {
+                            val perms = mutableListOf(
+                                Manifest.permission.RECEIVE_SMS,
+                                Manifest.permission.READ_SMS,
+                                Manifest.permission.SEND_SMS
+                            )
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                perms.add(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                            requestPermissionLauncher.launch(perms.toTypedArray())
+                        },
+                        onServiceStartRequired = { startSmsForegroundService() }
+                    ) {
+                        MainScreen(viewModel = viewModel)
                     }
                 }
             }

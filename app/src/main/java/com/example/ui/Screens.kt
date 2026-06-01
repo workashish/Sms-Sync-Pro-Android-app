@@ -56,18 +56,18 @@ fun MainScreen(viewModel: MainViewModel) {
     var showAddRuleDialog by remember { mutableStateOf(false) }
 
     Scaffold(
-        containerColor = com.example.ui.theme.PurpleSurface,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("SMS Sync Pro", fontWeight = FontWeight.Medium) },
+                title = { Text("SMS Sync Pro", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge) },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = com.example.ui.theme.PurpleSurface,
-                    titleContentColor = com.example.ui.theme.PurpleText
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground
                 ),
                 actions = {
                     if (selectedTabIndex == 1) { // Logs
                         TextButton(onClick = { viewModel.clearLogs() }) {
-                            Text("CLEAR LOGS", color = com.example.ui.theme.PurplePrimary)
+                            Text("CLEAR LOGS", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -77,9 +77,10 @@ fun MainScreen(viewModel: MainViewModel) {
             if (selectedTabIndex == 0) {
                 FloatingActionButton(
                     onClick = { showAddRuleDialog = true },
-                    containerColor = com.example.ui.theme.FabBg,
-                    contentColor = com.example.ui.theme.FabText,
-                    shape = RoundedCornerShape(16.dp)
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp, pressedElevation = 0.dp)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "Add Rule")
                 }
@@ -87,47 +88,26 @@ fun MainScreen(viewModel: MainViewModel) {
         },
         bottomBar = {
             NavigationBar(
-                containerColor = com.example.ui.theme.PurpleSurface,
-                tonalElevation = 8.dp
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 4.dp
             ) {
                 NavigationBarItem(
                     selected = selectedTabIndex == 0,
                     onClick = { selectedTabIndex = 0 },
                     icon = { Icon(Icons.Default.Menu, contentDescription = "Rules") },
-                    label = { Text("Rules") },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = com.example.ui.theme.PurplePrimary,
-                        selectedTextColor = com.example.ui.theme.PurplePrimary,
-                        indicatorColor = com.example.ui.theme.PurpleSecondary,
-                        unselectedIconColor = com.example.ui.theme.PurpleText.copy(alpha = 0.5f),
-                        unselectedTextColor = com.example.ui.theme.PurpleText.copy(alpha = 0.5f)
-                    )
+                    label = { Text("Rules", style = MaterialTheme.typography.labelSmall) }
                 )
                 NavigationBarItem(
                     selected = selectedTabIndex == 1,
                     onClick = { selectedTabIndex = 1 },
                     icon = { Icon(Icons.Default.List, contentDescription = "Logs") },
-                    label = { Text("Logs") },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = com.example.ui.theme.PurplePrimary,
-                        selectedTextColor = com.example.ui.theme.PurplePrimary,
-                        indicatorColor = com.example.ui.theme.PurpleSecondary,
-                        unselectedIconColor = com.example.ui.theme.PurpleText.copy(alpha = 0.5f),
-                        unselectedTextColor = com.example.ui.theme.PurpleText.copy(alpha = 0.5f)
-                    )
+                    label = { Text("Logs", style = MaterialTheme.typography.labelSmall) }
                 )
                 NavigationBarItem(
                     selected = selectedTabIndex == 2,
                     onClick = { selectedTabIndex = 2 },
                     icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-                    label = { Text("Settings") },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = com.example.ui.theme.PurplePrimary,
-                        selectedTextColor = com.example.ui.theme.PurplePrimary,
-                        indicatorColor = com.example.ui.theme.PurpleSecondary,
-                        unselectedIconColor = com.example.ui.theme.PurpleText.copy(alpha = 0.5f),
-                        unselectedTextColor = com.example.ui.theme.PurpleText.copy(alpha = 0.5f)
-                    )
+                    label = { Text("Settings", style = MaterialTheme.typography.labelSmall) }
                 )
             }
         }
@@ -152,6 +132,7 @@ fun MainScreen(viewModel: MainViewModel) {
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun RulesList(viewModel: MainViewModel) {
     val rules by viewModel.rules.collectAsStateWithLifecycle()
@@ -175,6 +156,7 @@ fun RulesList(viewModel: MainViewModel) {
                     onToggle = { id, isActive -> viewModel.toggleRule(id, isActive) },
                     onDelete = { viewModel.deleteRule(it) }
                 )
+                Spacer(modifier = Modifier.height(12.dp))
             }
         }
     }
@@ -184,23 +166,27 @@ fun RulesList(viewModel: MainViewModel) {
 fun StatusHeroCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = com.example.ui.theme.PurpleSecondary)
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
-            Text("SERVICE STATUS", style = MaterialTheme.typography.labelMedium, color = com.example.ui.theme.PurpleSecondaryText.copy(alpha = 0.7f), letterSpacing = 1.sp)
-            Spacer(modifier = Modifier.height(8.dp))
+            Text("SERVICE STATUS", style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f))
+            Spacer(modifier = Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-                Text("Active &\nMonitoring", style = MaterialTheme.typography.headlineSmall, color = com.example.ui.theme.PurpleSecondaryText, fontWeight = FontWeight.SemiBold)
+                Text("Active &\nMonitoring", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
                 Box(
-                    modifier = Modifier.size(48.dp).background(com.example.ui.theme.PurplePrimary, CircleShape),
+                    modifier = Modifier.size(48.dp).background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White)
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Ready to forward messages", style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.PurpleSecondaryText)
+            Spacer(modifier = Modifier.height(20.dp))
+            Text("Your forwarding engine is running smoothly.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f))
         }
     }
 }
@@ -208,21 +194,22 @@ fun StatusHeroCard() {
 @Composable
 fun SectionHeader(title: String) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(title, style = MaterialTheme.typography.labelLarge, color = com.example.ui.theme.PurpleText.copy(alpha = 0.8f))
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
     }
 }
 
 @Composable
 fun RuleItem(rule: ForwardingRule, onToggle: (Int, Boolean) -> Unit, onDelete: (Int) -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, com.example.ui.theme.BorderColor)
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
             Row(
@@ -232,18 +219,20 @@ fun RuleItem(rule: ForwardingRule, onToggle: (Int, Boolean) -> Unit, onDelete: (
             ) {
                 Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                     Box(
-                        modifier = Modifier.size(40.dp).background(if (rule.isActive) com.example.ui.theme.PurpleIconBg else Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+                        modifier = Modifier.size(48.dp).background(if (rule.isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), RoundedCornerShape(14.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         val iconText = if (rule.type == "SMS") "📱" else "🌐"
-                        Text(iconText, modifier = Modifier.alpha(if (rule.isActive) 1f else 0.5f))
+                        Text(iconText, modifier = Modifier.alpha(if (rule.isActive) 1f else 0.5f), fontSize = 20.sp)
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
-                        Text(rule.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = if (rule.isActive) com.example.ui.theme.PurpleText else Color.Gray)
-                        Text("${rule.type}: ${rule.target}", style = MaterialTheme.typography.bodySmall, color = if (rule.isActive) com.example.ui.theme.PurpleText.copy(alpha = 0.7f) else Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(rule.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = if (rule.isActive) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("${rule.type}: ${rule.target}", style = MaterialTheme.typography.bodySmall, color = if (rule.isActive) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         if (rule.keywordFilter.isNotEmpty()) {
-                            Text("Filter: '${rule.keywordFilter}'", style = MaterialTheme.typography.labelSmall, color = if (rule.isActive) com.example.ui.theme.PurplePrimary else Color.Gray)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Filter: '${rule.keywordFilter}'", style = MaterialTheme.typography.labelSmall, color = if (rule.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
                         }
                     }
                 }
@@ -253,50 +242,80 @@ fun RuleItem(rule: ForwardingRule, onToggle: (Int, Boolean) -> Unit, onDelete: (
                     modifier = Modifier.padding(start = 8.dp)
                 )
             }
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = com.example.ui.theme.BorderColor, thickness = 1.dp)
+            Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant, thickness = 1.dp)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
                 TextButton(onClick = { onDelete(rule.id) }) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete Rule", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Delete", color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
+                    Icon(Icons.Default.Delete, contentDescription = "Delete Rule", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Delete", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelLarge)
                 }
             }
         }
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun LogsList(viewModel: MainViewModel) {
     val logs by viewModel.logs.collectAsStateWithLifecycle()
+    var filterMode by remember { mutableStateOf("ALL") }
+
+    val filteredLogs = remember(logs, filterMode) {
+        when (filterMode) {
+            "SUCCESS" -> logs.filter { it.status == "SUCCESS" }
+            "FAILED" -> logs.filter { it.status != "SUCCESS" }
+            else -> logs
+        }
+    }
 
     LazyColumn(contentPadding = PaddingValues(16.dp)) {
         item {
-            SectionHeader(title = "Recent Activity")
-            Spacer(modifier = Modifier.height(8.dp))
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                SectionHeader(title = "Recent Activity")
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = filterMode == "ALL",
+                        onClick = { filterMode = "ALL" },
+                        label = { Text("All", style = MaterialTheme.typography.labelMedium) },
+                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.primaryContainer, selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer)
+                    )
+                    FilterChip(
+                        selected = filterMode == "SUCCESS",
+                        onClick = { filterMode = "SUCCESS" },
+                        label = { Text("Success", style = MaterialTheme.typography.labelMedium) },
+                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.primaryContainer, selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer)
+                    )
+                    FilterChip(
+                        selected = filterMode == "FAILED",
+                        onClick = { filterMode = "FAILED" },
+                        label = { Text("Failed", style = MaterialTheme.typography.labelMedium) },
+                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.errorContainer, selectedLabelColor = MaterialTheme.colorScheme.onErrorContainer)
+                    )
+                }
+            }
         }
 
-        if (logs.isEmpty()) {
+        if (filteredLogs.isEmpty()) {
             item {
                 Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                    Text("No logs available yet.")
+                    Text("No logs available matching this filter.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         } else {
-            item {
+            items(filteredLogs, key = { it.id }) { log ->
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    border = BorderStroke(1.dp, com.example.ui.theme.BorderColor)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    Column {
-                        logs.forEachIndexed { index, log ->
-                            LogItem(log, isLast = index == logs.size - 1)
-                        }
-                    }
+                    LogItem(log, isLast = true)
                 }
             }
         }
@@ -312,39 +331,41 @@ fun LogItem(log: SmsLog, isLast: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (isSuccess) Color.White else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f))
+            .background(if (isSuccess) Color.Transparent else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f))
             .clickable { expanded = !expanded }
     ) {
-        Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("${log.sender} -> ${log.ruleName}", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.PurplePrimary)
-                Spacer(modifier = Modifier.height(2.dp))
+                Text("${log.sender} → ${log.ruleName}", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     log.message,
                     style = MaterialTheme.typography.bodySmall,
-                    color = com.example.ui.theme.PurpleText,
-                    maxLines = if (expanded) Int.MAX_VALUE else 1,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = if (expanded) Int.MAX_VALUE else 2,
                     overflow = if (expanded) TextOverflow.Clip else TextOverflow.Ellipsis
                 )
                 if (expanded && !isSuccess) {
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         log.status,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(4.dp)).padding(4.dp)
                     )
                 }
             }
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Column(horizontalAlignment = Alignment.End) {
-                Text(dateFormat.format(Date(log.timestamp)), style = MaterialTheme.typography.labelSmall, color = com.example.ui.theme.PurpleText.copy(alpha = 0.6f))
+                Text(dateFormat.format(Date(log.timestamp)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f))
                 if (!isSuccess) {
-                   Text("FAILED", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                   Spacer(modifier = Modifier.height(4.dp))
+                   Text("FAILED", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                } else {
+                   Spacer(modifier = Modifier.height(4.dp))
+                   Icon(Icons.Default.CheckCircle, contentDescription = "Success", tint = com.example.ui.theme.SuccessGreen, modifier = Modifier.size(16.dp))
                 }
             }
-        }
-        if (!isLast) {
-            HorizontalDivider(color = com.example.ui.theme.BorderColor, thickness = 1.dp)
         }
     }
 }
@@ -400,9 +421,10 @@ fun SettingsList(viewModel: MainViewModel) {
         item {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(1.dp, com.example.ui.theme.BorderColor)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -410,9 +432,11 @@ fun SettingsList(viewModel: MainViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Enable App Forwarding", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = com.example.ui.theme.PurpleText)
-                        Text("Globally enable or disable all forwarding rules.", style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.PurpleText.copy(alpha = 0.7f))
+                        Text("Enable App Forwarding", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("Globally enable or disable all forwarding rules.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    Spacer(modifier = Modifier.width(16.dp))
                     Switch(
                         checked = globalEnable,
                         onCheckedChange = { 
@@ -427,9 +451,10 @@ fun SettingsList(viewModel: MainViewModel) {
         item {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(1.dp, com.example.ui.theme.BorderColor)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -437,9 +462,11 @@ fun SettingsList(viewModel: MainViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Include Device Model", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = com.example.ui.theme.PurpleText)
-                        Text("Send 'device_model' field in webhook JSON.", style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.PurpleText.copy(alpha = 0.7f))
+                        Text("Include Device Model", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("Send 'device_model' field in webhook JSON.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    Spacer(modifier = Modifier.width(16.dp))
                     Switch(
                         checked = includeDeviceModel,
                         onCheckedChange = { 
@@ -454,9 +481,10 @@ fun SettingsList(viewModel: MainViewModel) {
         item {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(1.dp, com.example.ui.theme.BorderColor)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -464,9 +492,11 @@ fun SettingsList(viewModel: MainViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Retry Failed Webhooks", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = com.example.ui.theme.PurpleText)
-                        Text("Attempt up to 3 retries if HTTP POST fails.", style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.PurpleText.copy(alpha = 0.7f))
+                        Text("Retry Failed Webhooks", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("Attempt up to 3 retries if HTTP POST fails.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    Spacer(modifier = Modifier.width(16.dp))
                     Switch(
                         checked = retryFailedWebhooks,
                         onCheckedChange = { 
@@ -481,15 +511,16 @@ fun SettingsList(viewModel: MainViewModel) {
         item {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(1.dp, com.example.ui.theme.BorderColor)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(16.dp)
                 ) {
-                    Text("Webhook Timeout (Seconds)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = com.example.ui.theme.PurpleText)
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Webhook Timeout (Seconds)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                    Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = webhookTimeout,
                         onValueChange = { 
@@ -500,10 +531,11 @@ fun SettingsList(viewModel: MainViewModel) {
                         },
                         singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Maximum wait time for connection & read.", style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.PurpleText.copy(alpha = 0.7f))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("Maximum wait time for connection & read.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -511,9 +543,10 @@ fun SettingsList(viewModel: MainViewModel) {
         item {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(1.dp, com.example.ui.theme.BorderColor)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -521,9 +554,11 @@ fun SettingsList(viewModel: MainViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Prevent Screen Capture", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = com.example.ui.theme.PurpleText)
-                        Text("Block screenshots and hide app content in recent apps. (Requires app restart).", style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.PurpleText.copy(alpha = 0.7f))
+                        Text("Prevent Screen Capture", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("Block screenshots and hide app content in recent apps. (Requires app restart).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    Spacer(modifier = Modifier.width(16.dp))
                     Switch(
                         checked = preventScreenCapture,
                         onCheckedChange = { 
@@ -537,16 +572,47 @@ fun SettingsList(viewModel: MainViewModel) {
 
         item {
             Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clickable {
+                    try {
+                        val intent = android.content.Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                            data = android.net.Uri.parse("package:${context.packageName}")
+                        }
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                    }
+                },
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Ignore Battery Optimization", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("Crucial for background reliability so Android doesn't kill the SMS service.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f))
+                    }
+                }
+            }
+        }
+
+        item {
+            Card(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(1.dp, com.example.ui.theme.BorderColor)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(16.dp)
                 ) {
-                    Text("Webhook Secret Key (HMAC)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = com.example.ui.theme.PurpleText)
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Webhook Secret Key (HMAC)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                    Spacer(modifier = Modifier.height(16.dp))
                     OutlinedTextField(
                         value = webhookSecret,
                         onValueChange = { 
@@ -555,10 +621,11 @@ fun SettingsList(viewModel: MainViewModel) {
                         },
                         singleLine = true,
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Adds an X-Signature HMAC-SHA256 header with webhook requests.", style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.PurpleText.copy(alpha = 0.7f))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("Adds an X-Signature HMAC-SHA256 header with webhook requests.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -566,15 +633,16 @@ fun SettingsList(viewModel: MainViewModel) {
         item {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(1.dp, com.example.ui.theme.BorderColor)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(16.dp)
                 ) {
-                    Text("End-to-End Encryption (AES-256)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = com.example.ui.theme.PurpleText)
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("End-to-End Encryption (AES-256)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                    Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = aesEncryptionKey,
                         onValueChange = { 
@@ -583,10 +651,11 @@ fun SettingsList(viewModel: MainViewModel) {
                         },
                         singleLine = true,
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Encrypts the message body before sending it to the webhook.", style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.PurpleText.copy(alpha = 0.7f))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("Encrypts the message body before sending it to the webhook.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -594,15 +663,16 @@ fun SettingsList(viewModel: MainViewModel) {
         item {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(1.dp, com.example.ui.theme.BorderColor)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(16.dp)
                 ) {
-                    Text("Custom Webhook Template", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = com.example.ui.theme.PurpleText)
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Custom Webhook Template", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                    Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = customWebhookTemplate,
                         onValueChange = { 
@@ -611,10 +681,11 @@ fun SettingsList(viewModel: MainViewModel) {
                         },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 3,
-                        maxLines = 10
+                        maxLines = 10,
+                        shape = RoundedCornerShape(12.dp)
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Variables: {sender}, {message}, {device_model}. Leave empty for standard json payload.", style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.PurpleText.copy(alpha = 0.7f))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("Variables: {sender}, {message}, {device_model}. Leave empty for standard json payload.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -622,9 +693,10 @@ fun SettingsList(viewModel: MainViewModel) {
         item {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(1.dp, com.example.ui.theme.BorderColor)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -632,9 +704,11 @@ fun SettingsList(viewModel: MainViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Enable SMS Commands", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = com.example.ui.theme.PurpleText)
-                        Text("Reply with Battery % and Network if you text 'STATUS' to this phone.", style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.PurpleText.copy(alpha = 0.7f))
+                        Text("Enable SMS Commands", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("Reply with Battery % and Network if you text 'STATUS' to this phone.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    Spacer(modifier = Modifier.width(16.dp))
                     Switch(
                         checked = enableSmsCommands,
                         onCheckedChange = { 
@@ -649,15 +723,16 @@ fun SettingsList(viewModel: MainViewModel) {
         item {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(1.dp, com.example.ui.theme.BorderColor)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(16.dp)
                 ) {
-                    Text("Tools & Extras", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = com.example.ui.theme.PurpleText)
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Tools & Extras", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                    Spacer(modifier = Modifier.height(16.dp))
                     
                     Button(
                         onClick = {
@@ -683,7 +758,12 @@ fun SettingsList(viewModel: MainViewModel) {
                                             .putBoolean("isTest", true)
                                             .build()
 
+                                        val constraints = Constraints.Builder()
+                                            .setRequiredNetworkType(NetworkType.CONNECTED)
+                                            .build()
+
                                         val workRequest = OneTimeWorkRequestBuilder<WebhookWorker>()
+                                            .setConstraints(constraints)
                                             .setInputData(data)
                                             .build()
 
@@ -820,7 +900,7 @@ fun AddRuleDialog(onDismiss: () -> Unit, onAdd: (String, String, String, String)
                 OutlinedTextField(
                     value = keywordFilter,
                     onValueChange = { keywordFilter = it },
-                    label = { Text("Keyword Filter (Optional)") },
+                    label = { Text("Filter (Text or /regex/i)") },
                     modifier = Modifier.fillMaxWidth()
                 )
             }

@@ -12,30 +12,40 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme =
-  darkColorScheme(primary = Purple80, secondary = PurpleGrey80, tertiary = Pink80)
+  darkColorScheme(
+    primary = PrimaryBlueDark,
+    secondary = FoundationGray900,
+    background = DarkBackground,
+    surface = DarkSurface,
+    surfaceVariant = DarkBorder,
+    onPrimary = Color(0xFF0F172A), // Dark text on light blue buttons
+    onSecondary = Color.White,
+    onBackground = DarkText,
+    onSurface = DarkText,
+    onSurfaceVariant = DarkTextSecondary
+  )
 
 private val LightColorScheme =
   lightColorScheme(
-    primary = PurplePrimary,
-    secondary = PurpleSecondary,
-    tertiary = FabBg,
-    background = PurpleSurface,
-    surface = PurpleSurface,
-    surfaceVariant = PurpleSurfaceVariant,
+    primary = BrandBlue, // Use BrandBlue instead of PrimaryBlue for Light Mode to make buttons pop
+    secondary = FoundationWhite,
+    background = LightBackground,
+    surface = LightSurface,
+    surfaceVariant = LightBorder,
     onPrimary = Color.White,
-    onSecondary = PurpleSecondaryText,
-    onBackground = PurpleText,
-    onSurface = PurpleText,
+    onSecondary = LightText,
+    onBackground = LightText,
+    onSurface = LightText,
+    onSurfaceVariant = LightTextSecondary
   )
 
 @Composable
 fun MyApplicationTheme(
   darkTheme: Boolean = isSystemInDarkTheme(),
-  // Disable dynamic color so we enforce our theme
-  dynamicColor: Boolean = false,
+  dynamicColor: Boolean = false, // Keep false for strict brand control
   content: @Composable () -> Unit,
 ) {
-  val colorScheme = LightColorScheme
+  val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
 
   MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
 }

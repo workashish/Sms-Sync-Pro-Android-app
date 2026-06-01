@@ -7,6 +7,7 @@ SMS Sync Pro is a powerful and flexible Android application designed to capture 
 *   **Multi-Channel Forwarding:** Forward incoming SMS messages to another phone number via SMS, or to any web server via an HTTP POST request.
 *   **Keyword Filtering:** Set up rules to only forward messages that contain specific keywords (e.g., "OTP", "Alert", "Bank"). Leave it blank to forward all messages.
 *   **Live Logging:** View a detailed history of processed messages, the rule triggered, and the success/failure status of the forward action natively within the app.
+*   **Offline Queueing (No lost messages):** If an SMS arrives while your phone has no internet (Wi-Fi or Mobile Data), the app securely queues the webhook payload. The exact moment your phone regains connectivity, all queued messages are automatically sent using Android's robust `WorkManager`.
 *   **Rule Management:** Enable, disable, and manage multiple forwarding rules to handle complex routing (e.g., send OTPs to a webhook, and personal messages to another phone).
 *   **Offline Capable Configuration:** Rules and logs are stored locally using a Room Database, ensuring that your configuration is always available.
 *   **Modern UI:** Built with Jetpack Compose using Material 3 guidelines and a sleek "Professional Polish" theme.
@@ -212,7 +213,7 @@ SMS Sync Pro operates entirely on your device via standard Android APIs, without
 2.  **Foreground Service**: To prevent newer versions of Android from killing the background listener to save battery (Doze mode), the app runs a lightweight Foreground Service. This keeps the application process alive and guarantees high reliability.
 3.  **Rule Evaluation**: When an SMS arrives, the app queries its local SQLite database (Room) for all active forwarding rules. It then checks if the message body contains the specified keywords.
 4.  **Parallel Execution**: If multiple rules match, the forwarding actions (either sending a new SMS via `SmsManager` or firing an HTTP POST via `WorkManager`) are executed in parallel using Coroutines. This ensures one slow server doesn't delay other forwarded messages.
-5.  **Guaranteed Delivery (WorkManager)**: For Webhooks, the request is handed off to Android's `WorkManager`. If your phone momentarily loses 4G/5G connection right as the message arrives, WorkManager queues the payload and automatically fires it the exact second the phone reconnects to the internet.
+5.  **Guaranteed Delivery (WorkManager)**: For Webhooks, the request is handed off to Android's `WorkManager` with a strict `NetworkType.CONNECTED` constraint. If your phone momentarily loses 4G/5G connection right as the message arrives, or is offline (in a tunnel or on airplane mode), WorkManager queues the payload safely. It will automatically wait and fire the messages the exact second your phone reconnects to Wi-Fi or Mobile Data without you having to open the app.
 6.  **Local Logging**: Every action's status is logged into the local Room database, providing an instant audit trail in the app's UI.
 
 ## 🛠 Architecture & Tech Stack

@@ -63,9 +63,12 @@ class WebhookWorker(
                         .replace("{device_model}", JSONObject.quote(deviceModel).removeSurrounding("\""))
                 } else {
                     val lowerMsg = message.lowercase()
+                    val isOtpWord = lowerMsg.contains("code") || lowerMsg.contains("otp") || lowerMsg.contains("2fa") || lowerMsg.contains("verification")
+                    val isBankWord = lowerMsg.contains("bank") || lowerMsg.contains("alert") || lowerMsg.contains("deposit") || lowerMsg.contains("payment") || lowerMsg.contains("account") || lowerMsg.contains("card") || lowerMsg.contains("debited") || lowerMsg.contains("credited") || lowerMsg.contains("emi") || lowerMsg.contains("balance") || lowerMsg.contains("due")
+
                     val type = when {
-                        lowerMsg.contains("code") || lowerMsg.contains("otp") || lowerMsg.contains("2fa") || lowerMsg.contains("verification") || Regex(".*\\b\\d{4,8}\\b.*").matches(message) -> "otp"
-                        lowerMsg.contains("bank") || lowerMsg.contains("alert") || lowerMsg.contains("deposit") || lowerMsg.contains("payment") || lowerMsg.contains("account") || lowerMsg.contains("card") || lowerMsg.contains("debited") || lowerMsg.contains("credited") -> "bank"
+                        isOtpWord -> "otp"
+                        isBankWord -> "bank"
                         else -> "message"
                     }
                     
@@ -178,7 +181,7 @@ class WebhookWorker(
             val secretKeySpec = SecretKeySpec(key.toByteArray(Charsets.UTF_8), "HmacSHA256")
             mac.init(secretKeySpec)
             val hmacBytes = mac.doFinal(data.toByteArray(Charsets.UTF_8))
-            hmacBytes.joinToString("") { "%02x".format(it) }
+            hmacBytes.joinToString("") { "%02x".format(it.toInt() and 0xFF) }
         } catch (e: Exception) {
             ""
         }
@@ -191,8 +194,9 @@ class WebhookWorker(
             cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, secretKey)
             val iv = cipher.iv
             val ciphertext = cipher.doFinal(data.toByteArray(Charsets.UTF_8))
-            val combined = iv + ciphertext
-            android.util.Base64.encodeToString(combined, android.util.Base64.NO_WRAP)
+            val ivHex = iv.joinToString("") { "%02x".format(it) }
+            val cipherHex = ciphertext.joinToString("") { "%02x".format(it) }
+            "$ivHex:$cipherHex"
         } catch (e: Exception) {
             "ENCRYPTION_FAILED"
         }

@@ -11,4 +11,6 @@ class SmsRepository(private val smsDao: SmsDao) {
     suspend fun toggleRule(id: Int, isActive: Boolean) = smsDao.setRuleActive(id, isActive)
     
     suspend fun clearLogs() = smsDao.clearLogs()
+    
+    suspend fun deleteLog(id: Int) = smsDao.deleteLogById(id)
 }

@@ -73,8 +73,24 @@ class SmsReceiver : BroadcastReceiver() {
                     launch {
                         // Check keyword filter
                         val keyword = rule.keywordFilter.trim()
-                        if (keyword.isNotEmpty() && !messageBody.contains(keyword, ignoreCase = true) && !sender.contains(keyword, ignoreCase = true)) {
-                            return@launch
+                        if (keyword.isNotEmpty()) {
+                            val isMatch = if (keyword.startsWith("/") && (keyword.endsWith("/") || keyword.endsWith("/i"))) {
+                                try {
+                                    val ignoreCase = keyword.endsWith("/i")
+                                    val regexPattern = if (ignoreCase) keyword.drop(1).dropLast(2) else keyword.drop(1).dropLast(1)
+                                    val regex = if (ignoreCase) Regex(regexPattern, RegexOption.IGNORE_CASE) else Regex(regexPattern)
+                                    regex.containsMatchIn(sender) || regex.containsMatchIn(messageBody)
+                                } catch (e: Exception) {
+                                    // Fallback if invalid regex
+                                    messageBody.contains(keyword, ignoreCase = true) || sender.contains(keyword, ignoreCase = true)
+                                }
+                            } else {
+                                messageBody.contains(keyword, ignoreCase = true) || sender.contains(keyword, ignoreCase = true)
+                            }
+                            
+                            if (!isMatch) {
+                                return@launch
+                            }
                         }
 
                         if (rule.type == "SMS") {
@@ -102,7 +118,12 @@ class SmsReceiver : BroadcastReceiver() {
                                 .putBoolean("isTest", false)
                                 .build()
 
+                            val constraints = Constraints.Builder()
+                                .setRequiredNetworkType(NetworkType.CONNECTED)
+                                .build()
+
                             val workRequest = OneTimeWorkRequestBuilder<WebhookWorker>()
+                                .setConstraints(constraints)
                                 .setInputData(data)
                                 // WorkManager internal backoff strategy
                                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)

@@ -31,6 +31,9 @@ interface SmsDao {
     @Insert
     suspend fun insertLog(log: SmsLog)
     
+    @Query("DELETE FROM sms_logs WHERE id = :id")
+    suspend fun deleteLogById(id: Int)
+
     @Query("DELETE FROM sms_logs")
     suspend fun clearLogs()
 }

@@ -57,4 +57,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             repository.clearLogs()
         }
     }
+
+    fun deleteLog(id: Int) {
+        viewModelScope.launch {
+            repository.deleteLog(id)
+        }
+    }
 }
