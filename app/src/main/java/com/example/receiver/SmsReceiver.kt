@@ -6,18 +6,20 @@ import android.content.Intent
 import android.provider.Telephony
 import android.telephony.SmsManager
 import android.util.Log
+import androidx.work.BackoffPolicy
+import androidx.work.Constraints
+import androidx.work.Data
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.example.data.AppDatabase
 import com.example.data.SmsLog
+import com.example.worker.WebhookWorker
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import org.json.JSONObject
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
-import java.net.URL
-import javax.crypto.Mac
-import javax.crypto.spec.SecretKeySpec
+import java.util.concurrent.TimeUnit
 
 class SmsReceiver : BroadcastReceiver() {
 
@@ -38,11 +40,30 @@ class SmsReceiver : BroadcastReceiver() {
         val messageBody = messages.joinToString(separator = "") { it.messageBody ?: "" }
 
         Log.d("SmsReceiver", "Received SMS from $sender: $messageBody")
+        
+        if (settings.enableSmsCommands) {
+            val cmd = messageBody.trim().uppercase()
+            if (cmd == "STATUS") {
+                val batteryStatus = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+                val level = batteryStatus?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+                val scale = batteryStatus?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
+                val batteryPct = if (level != -1 && scale != -1) (level * 100 / scale.toFloat()).toInt() else -1
+                
+                val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as android.telephony.TelephonyManager
+                val networkName = try { telephonyManager.networkOperatorName } catch(e: Exception) { "Unknown" }
+                
+                val reply = "STATUS\nBattery: $batteryPct%\nNetwork: $networkName"
+                forwardViaSms(context, sender, reply)
+                return
+            } else if (cmd == "REBOOT" || cmd == "LOCATION") {
+                val reply = "Command $cmd received but requires elevated permissions or root."
+                forwardViaSms(context, sender, reply)
+                return
+            }
+        }
 
         val pendingResult = goAsync()
 
-        // For production, WorkManager is recommended, but this handles quick requests.
-        // Process rules in parallel to avoid hitting the 10s BroadcastReceiver timeout if there are multiple webhooks.
         GlobalScope.launch(Dispatchers.IO) {
             try {
                 val db = AppDatabase.getDatabase(context)
@@ -56,28 +77,46 @@ class SmsReceiver : BroadcastReceiver() {
                             return@launch
                         }
 
-                        var status = "SUCCESS"
-                        try {
-                            if (rule.type == "SMS") {
+                        if (rule.type == "SMS") {
+                            var status = "SUCCESS"
+                            try {
                                 forwardViaSms(context, rule.target, "$sender:\n$messageBody")
-                            } else if (rule.type == "WEBHOOK") {
-                                forwardViaWebhook(rule.target, sender, messageBody, settings)
+                            } catch (e: Exception) {
+                                status = "FAILED: ${e.message?.take(50)}"
                             }
-                        } catch (e: Exception) {
-                            Log.e("SmsReceiver", "Failed to forward via rule ${rule.name}", e)
-                            status = "FAILED: ${e.message?.take(50)}"
-                        }
-
-                        // Log to DB
-                        db.smsDao().insertLog(
-                            SmsLog(
-                                sender = sender,
-                                message = messageBody,
-                                ruleName = rule.name,
-                                target = rule.target,
-                                status = status
+                            db.smsDao().insertLog(
+                                SmsLog(
+                                    sender = sender,
+                                    message = messageBody,
+                                    ruleName = rule.name,
+                                    target = rule.target,
+                                    status = status
+                                )
                             )
-                        )
+                        } else if (rule.type == "WEBHOOK") {
+                            val data = Data.Builder()
+                                .putString("url", rule.target)
+                                .putString("sender", sender)
+                                .putString("message", messageBody)
+                                .putString("ruleName", rule.name)
+                                .putBoolean("isTest", false)
+                                .build()
+
+                            val constraints = Constraints.Builder()
+                                .setRequiredNetworkType(NetworkType.CONNECTED)
+                                .build()
+
+                            val workRequest = OneTimeWorkRequestBuilder<WebhookWorker>()
+                                .setInputData(data)
+                                .setConstraints(constraints)
+                                // WorkManager internal backoff strategy
+                                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
+                                .build()
+
+                            WorkManager.getInstance(context).enqueue(workRequest)
+                            
+                            // Let the worker handle logging to the database!
+                        }
                     }
                 }
                 jobs.forEach { it.join() }
@@ -100,77 +139,6 @@ class SmsReceiver : BroadcastReceiver() {
         smsManager?.let {
             val parts = it.divideMessage(message)
             it.sendMultipartTextMessage(targetNumber, null, parts, null, null)
-        }
-    }
-
-    private fun generateHmacSha256(data: String, key: String): String {
-        try {
-            val mac = Mac.getInstance("HmacSHA256")
-            val secretKeySpec = SecretKeySpec(key.toByteArray(Charsets.UTF_8), "HmacSHA256")
-            mac.init(secretKeySpec)
-            val hmacBytes = mac.doFinal(data.toByteArray(Charsets.UTF_8))
-            return hmacBytes.joinToString("") { "%02x".format(it) }
-        } catch (e: Exception) {
-            return ""
-        }
-    }
-
-    private fun forwardViaWebhook(urlString: String, sender: String, message: String, settings: com.example.data.SettingsManager) {
-        var success = false
-        val maxAttempts = if (settings.retryFailedWebhooks) 3 else 1
-        var attempt = 0
-        var lastException: Exception? = null
-
-        while (attempt < maxAttempts && !success) {
-            attempt++
-            val url = URL(urlString)
-            val connection = url.openConnection() as HttpURLConnection
-            try {
-                connection.connectTimeout = settings.webhookTimeout * 1000
-                connection.readTimeout = settings.webhookTimeout * 1000
-                connection.requestMethod = "POST"
-                connection.setRequestProperty("Content-Type", "application/json")
-                connection.setRequestProperty("Accept", "application/json")
-                connection.doOutput = true
-
-                val jsonOutput = JSONObject().apply {
-                    put("sender", sender)
-                    put("message", message)
-                    if (settings.includeDeviceModel) {
-                        put("device_model", android.os.Build.MODEL)
-                    }
-                    put("timestamp", System.currentTimeMillis())
-                }.toString()
-
-                if (settings.webhookSecret.isNotEmpty()) {
-                    val signature = generateHmacSha256(jsonOutput, settings.webhookSecret)
-                    if (signature.isNotEmpty()) {
-                        connection.setRequestProperty("X-Signature", signature)
-                    }
-                }
-
-                val writer = OutputStreamWriter(connection.outputStream)
-                writer.write(jsonOutput)
-                writer.flush()
-                writer.close()
-
-                val responseCode = connection.responseCode
-                if (responseCode !in 200..299) {
-                    throw Exception("HTTP Error: $responseCode")
-                }
-                success = true
-            } catch (e: Exception) {
-                lastException = e
-                if (attempt < maxAttempts) {
-                    Thread.sleep(1000) // basic backoff
-                }
-            } finally {
-                connection.disconnect()
-            }
-        }
-        
-        if (!success) {
-            throw lastException ?: Exception("Unknown forwarding error")
         }
     }
 }

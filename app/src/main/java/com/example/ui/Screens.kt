@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -24,6 +25,23 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.ForwardingRule
 import com.example.data.SmsLog
 import com.example.viewmodel.MainViewModel
+
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.compose.ui.platform.LocalContext
+import androidx.work.Data
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.Constraints
+import androidx.work.NetworkType
+import com.example.data.AppDatabase
+import com.example.worker.WebhookWorker
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.example.data.ExportImportManager
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -126,7 +144,11 @@ fun RulesList(viewModel: MainViewModel) {
             }
         } else {
             items(rules) { rule ->
-                RuleItem(rule, onDelete = { viewModel.deleteRule(it) })
+                RuleItem(
+                    rule = rule,
+                    onToggle = { id, isActive -> viewModel.toggleRule(id, isActive) },
+                    onDelete = { viewModel.deleteRule(it) }
+                )
             }
         }
     }
@@ -169,37 +191,52 @@ fun SectionHeader(title: String) {
 }
 
 @Composable
-fun RuleItem(rule: ForwardingRule, onDelete: (Int) -> Unit) {
+fun RuleItem(rule: ForwardingRule, onToggle: (Int, Boolean) -> Unit, onDelete: (Int) -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         border = BorderStroke(1.dp, com.example.ui.theme.BorderColor)
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(40.dp).background(com.example.ui.theme.PurpleIconBg, RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val iconText = if (rule.type == "SMS") "📱" else "🌐"
-                    Text(iconText)
-                }
-                Spacer(modifier = Modifier.width(16.dp))
-                Column {
-                    Text(rule.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = com.example.ui.theme.PurpleText)
-                    Text("${rule.type}: ${rule.target}", style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.PurpleText.copy(alpha = 0.7f))
-                    if (rule.keywordFilter.isNotEmpty()) {
-                        Text("Filter: '${rule.keywordFilter}'", style = MaterialTheme.typography.labelSmall, color = com.example.ui.theme.PurplePrimary)
+        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier.size(40.dp).background(if (rule.isActive) com.example.ui.theme.PurpleIconBg else Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val iconText = if (rule.type == "SMS") "📱" else "🌐"
+                        Text(iconText, modifier = Modifier.alpha(if (rule.isActive) 1f else 0.5f))
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(rule.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = if (rule.isActive) com.example.ui.theme.PurpleText else Color.Gray)
+                        Text("${rule.type}: ${rule.target}", style = MaterialTheme.typography.bodySmall, color = if (rule.isActive) com.example.ui.theme.PurpleText.copy(alpha = 0.7f) else Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (rule.keywordFilter.isNotEmpty()) {
+                            Text("Filter: '${rule.keywordFilter}'", style = MaterialTheme.typography.labelSmall, color = if (rule.isActive) com.example.ui.theme.PurplePrimary else Color.Gray)
+                        }
                     }
                 }
+                Switch(
+                    checked = rule.isActive,
+                    onCheckedChange = { onToggle(rule.id, it) },
+                    modifier = Modifier.padding(start = 8.dp)
+                )
             }
-            IconButton(onClick = { onDelete(rule.id) }) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete Rule", tint = com.example.ui.theme.PurpleText.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = com.example.ui.theme.BorderColor, thickness = 1.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = { onDelete(rule.id) }) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete Rule", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Delete", color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
+                }
             }
         }
     }
@@ -270,6 +307,8 @@ fun LogItem(log: SmsLog, isLast: Boolean) {
 @Composable
 fun SettingsList(viewModel: MainViewModel) {
     val settings = viewModel.settingsManager
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     var globalEnable by remember { mutableStateOf(settings.globalEnable) }
     var includeDeviceModel by remember { mutableStateOf(settings.includeDeviceModel) }
@@ -277,6 +316,9 @@ fun SettingsList(viewModel: MainViewModel) {
     var retryFailedWebhooks by remember { mutableStateOf(settings.retryFailedWebhooks) }
     var webhookSecret by remember { mutableStateOf(settings.webhookSecret) }
     var preventScreenCapture by remember { mutableStateOf(settings.preventScreenCapture) }
+    var aesEncryptionKey by remember { mutableStateOf(settings.aesEncryptionKey) }
+    var customWebhookTemplate by remember { mutableStateOf(settings.customWebhookTemplate) }
+    var enableSmsCommands by remember { mutableStateOf(settings.enableSmsCommands) }
 
     LazyColumn(contentPadding = PaddingValues(16.dp)) {
         item {
@@ -446,6 +488,217 @@ fun SettingsList(viewModel: MainViewModel) {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text("Adds an X-Signature HMAC-SHA256 header with webhook requests.", style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.PurpleText.copy(alpha = 0.7f))
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, com.example.ui.theme.BorderColor)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                ) {
+                    Text("End-to-End Encryption (AES-256)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = com.example.ui.theme.PurpleText)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = aesEncryptionKey,
+                        onValueChange = { 
+                            aesEncryptionKey = it
+                            settings.aesEncryptionKey = it
+                        },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Encrypts the message body before sending it to the webhook.", style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.PurpleText.copy(alpha = 0.7f))
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, com.example.ui.theme.BorderColor)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                ) {
+                    Text("Custom Webhook Template", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = com.example.ui.theme.PurpleText)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = customWebhookTemplate,
+                        onValueChange = { 
+                            customWebhookTemplate = it
+                            settings.customWebhookTemplate = it
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        maxLines = 10
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Variables: {sender}, {message}, {device_model}. Leave empty for standard json payload.", style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.PurpleText.copy(alpha = 0.7f))
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, com.example.ui.theme.BorderColor)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Enable SMS Commands", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = com.example.ui.theme.PurpleText)
+                        Text("Reply with Battery % and Network if you text 'STATUS' to this phone.", style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.PurpleText.copy(alpha = 0.7f))
+                    }
+                    Switch(
+                        checked = enableSmsCommands,
+                        onCheckedChange = { 
+                            enableSmsCommands = it
+                            settings.enableSmsCommands = it
+                        }
+                    )
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, com.example.ui.theme.BorderColor)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                ) {
+                    Text("Tools & Extras", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = com.example.ui.theme.PurpleText)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+                        uri?.let { 
+                            scope.launch {
+                                ExportImportManager(context).exportConfig(it)
+                            }
+                        }
+                    }
+
+                    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                        uri?.let {
+                            scope.launch {
+                                ExportImportManager(context).importConfig(it)
+                                // Reload settings locally so UI updates
+                                globalEnable = settings.globalEnable
+                                includeDeviceModel = settings.includeDeviceModel
+                                retryFailedWebhooks = settings.retryFailedWebhooks
+                                webhookTimeout = settings.webhookTimeout.toString()
+                                webhookSecret = settings.webhookSecret
+                                preventScreenCapture = settings.preventScreenCapture
+                                aesEncryptionKey = settings.aesEncryptionKey
+                                customWebhookTemplate = settings.customWebhookTemplate
+                                enableSmsCommands = settings.enableSmsCommands
+                            }
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            scope.launch(Dispatchers.IO) {
+                                val db = AppDatabase.getDatabase(context)
+                                val rules = db.smsDao().getActiveRules()
+                                val webhookRules = rules.filter { it.type == "WEBHOOK" }
+                                
+                                if (webhookRules.isEmpty()) {
+                                    // Normally we show a toast, but this is background IO thread. Toasts crash.
+                                } else {
+                                    webhookRules.forEach { rule ->
+                                        val data = Data.Builder()
+                                            .putString("url", rule.target)
+                                            .putString("sender", "+1234567890 (Test Webhook)")
+                                            .putString("message", "This is a test webhook sent from SMS Sync Pro.")
+                                            .putString("ruleName", "Test: ${rule.name}")
+                                            .putBoolean("isTest", false)
+                                            .build()
+
+                                        val constraints = Constraints.Builder()
+                                            .setRequiredNetworkType(NetworkType.CONNECTED)
+                                            .build()
+
+                                        val workRequest = OneTimeWorkRequestBuilder<WebhookWorker>()
+                                            .setInputData(data)
+                                            .setConstraints(constraints)
+                                            .build()
+
+                                        WorkManager.getInstance(context).enqueue(workRequest)
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Send Test Webhook")
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    OutlinedButton(
+                        onClick = {
+                            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                            }
+                            try {
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Request Battery Optimization Exemption")
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        OutlinedButton(
+                            onClick = { 
+                                try {
+                                    exportLauncher.launch("sms_sync_pro_config.json")
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Export Config")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        OutlinedButton(
+                            onClick = { 
+                                try {
+                                    importLauncher.launch(arrayOf("application/json"))
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Import Config")
+                        }
+                    }
                 }
             }
         }

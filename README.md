@@ -49,83 +49,108 @@ The HTTP POST request contains a JSON body with the following structure:
 If you are planning to build a custom website or endpoint to receive these webhooks, here is an exhaustive checklist of things you must implement to ensure reliability and security:
 
 1.  **Publicly Accessible Endpoint**: Your server must be accessible from the Android device's network. If the phone is on mobile data, the server needs a public IP or domain (e.g., hosted on Vercel, Heroku, AWS, DigitalOcean).
-2.  **HTTPS (SSL/TLS) Required for Production**: You **MUST** use `https://` (SSL) for your webhook URL. Do not use `http://` in production. SMS data (especially bank OTPs) sent over plain HTTP can be intercepted by anyone on the network.
+2.  **HTTPS (SSL/TLS) Required for Production**: You **MUST** use `https://` (SSL) for your webhook URL. Do not use `http://` in production.
 3.  **Accept HTTP POST Requests**: The endpoint must listen for `POST` requests, not `GET`.
-4.  **Parse `application/json` Content-Type**: The payload is sent as stringified JSON. Your server framework (Express, Flask, Laravel, etc.) must be configured to parse JSON bodies.
-5.  **Fast Response Times (Under 3 seconds)**: Your endpoint should quickly respond with an HTTP status code between `200` and `299` (e.g., `200 OK`). If your server does heavy processing (like sending emails or pushing to a database), return `200 OK` *immediately*, and then do the heavy lifting asynchronously. If your server takes too long (over the timeout set in the app settings, default 8 seconds), the app will mark it as "FAILED" and may attempt retries, leading to duplicate messages.
-6.  **Idempotency & Duplicate Handling**: Because the app has a "Retry Failed Webhooks" feature (and network drops can cause identical requests), your server should handle duplicate data gracefully. You can use a combination of `sender`, `message`, and `timestamp` to detect and ignore exact duplicates.
-7.  **HMAC Signature Verification (CRITICAL)**: Since you are dealing with financial OTPs, your webhook URL is essentially a public door. To prevent attackers from sending fake SMS data to your endpoint, you MUST:
-    *   Set a complex string in the **Webhook Secret Key (HMAC)** setting in the Android app.
-    *   On your server, grab the raw, unmodified request body.
-    *   Compute an HMAC-SHA256 hash using the same secret key.
-    *   Compare your computed hash with the hash sent in the `X-Signature` HTTP header.
-    *   If they don't match, reject the request with `401 Unauthorized` or `403 Forbidden`.
-8.  **WAF & Bot Protection Rules**: If you are using Cloudflare, AWS WAF, or other firewalls, ensure they do not block automated JSON POST requests. You may need to add a firewall rule to explicitly allow traffic to your webhook route.
-
-### PHP Example (Server-Side)
-```php
-<?php
-$data = json_decode(file_get_contents('php://input'), true);
-
-if ($data) {
-    $sender = $data['sender'];
-    $message = $data['message'];
-    $device = $data['device_model'];
-    $time = date('Y-m-d H:i:s', $data['timestamp'] / 1000);
-    
-    // Verify HMAC Signature (if you configured a Webhook Secret in the app)
-    $secret = "YOUR_APP_SECRET_KEY"; // Must match the secret in the app settings
-    $signature = $_SERVER['HTTP_X_SIGNATURE'] ?? '';
-    // To properly check HMAC, you need the raw input string exactly as sent
-    $rawBody = file_get_contents('php://input');
-    $expectedSignature = hash_hmac('sha256', $rawBody, $secret);
-
-    // If using the secret key, uncomment the below lines to enforce security
-    // if ($signature !== $expectedSignature) {
-    //     error_log("Invalid Webhook Signature!");
-    //     http_response_code(401);
-    //     exit;
-    // }
-
-    // Save to database, push to websocket, or email via SMTP
-    error_log("[$time] SMS from $sender on $device: $message");
-    http_response_code(200);
-} else {
-    http_response_code(400);
-}
-?>
-```
+4.  **Parse `application/json` Content-Type**: The payload is sent as stringified JSON (unless overridden by a Custom Template). Your server framework (Express, Flask, Laravel, etc.) must be configured to parse JSON bodies.
+5.  **Fast Response Times (Under 3 seconds)**: Your endpoint should quickly respond with an HTTP status code between `200` and `299`. Do heavy lifting (like sending emails) asynchronously.
+6.  **Idempotency & Duplicate Handling**: Because the app uses Android `WorkManager` (which guarantees delivery and handles retries automatically), your server should handle duplicate data gracefully. Use `timestamp` and `message` combinations to ignore duplicates.
+7.  **HMAC Signature Verification (CRITICAL)**: If you set a **Webhook Secret** in the app:
+    *   The app sends an `X-Signature` HTTP header containing an HMAC-SHA256 signature.
+    *   Grab the raw, unmodified request body on your server.
+    *   Compute an HMAC-SHA256 hash using your secret key.
+    *   Compare the hash — if they don't match, reject the request with a `401`.
+8.  **AES-256 Decryption (CRITICAL)**: If you configure an **AES Encryption Key** in the app:
+    *   The `message` field in the JSON payload will *no longer* be plain text. Instead, it will be a Base64 encoded string containing the Initialization Vector (IV) and the Ciphertext.
+    *   Your server must base64 decode the string.
+    *   Extract the first 16 bytes. That is your `IV`.
+    *   The remaining bytes are the `ciphertext`.
+    *   Use a SHA-256 hash of your plaintext AES password as the actual 32-byte AES key.
+    *   Decrypt using `AES-256-CBC` algorithm.
 
 ### Node.js Example (Server-Side)
+Here is a complete, production-ready Express server that handles HMAC verification AND AES-256 decryption:
+
 ```javascript
 const express = require('express');
+const crypto = require('crypto');
 const app = express();
-app.use(express.json({
-    // Store the raw body buffer to properly verify HMAC signature
-    verify: (req, res, buf) => { req.rawBody = buf; }
-}));
+
+const HMAC_SECRET = "YOUR_HMAC_SECRET_KEY"; // Must match "Webhook Secret Key (HMAC)" in app
+const AES_PASSWORD = "YOUR_AES_PASSWORD";   // Must match "AES Encryption Key" in app
+
+// Store raw body buffer for HMAC
+app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
+
+// AES-256 Decryption Helper
+function decryptMessage(base64Payload) {
+    if (!AES_PASSWORD) return base64Payload; // If not encrypted
+    
+    try {
+        const payloadBuffer = Buffer.from(base64Payload, 'base64');
+        const iv = payloadBuffer.subarray(0, 16); // First 16 bytes
+        const ciphertext = payloadBuffer.subarray(16);
+        
+        // Android app uses SHA-256 hash of the password as the 32-byte key
+        const key = crypto.createHash('sha256').update(AES_PASSWORD).digest();
+        
+        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+        let decrypted = decipher.update(ciphertext, undefined, 'utf8');
+        decrypted += decipher.final('utf8');
+        return decrypted;
+    } catch (e) {
+        console.error("AES Decryption failed", e);
+        return "DECRYPTION_FAILED";
+    }
+}
 
 app.post('/sms-webhook', (req, res) => {
-    // Verify HMAC Signature (if you configured a Webhook Secret in the app)
-    const secret = "YOUR_APP_SECRET_KEY"; // Must match the app settings
-    const signature = req.headers['x-signature'];
-    
-    // If using the secret key, uncomment the below lines to enforce security
-    // const crypto = require('crypto');
-    // const expectedSignature = crypto.createHmac('sha256', secret).update(req.rawBody).digest('hex');
-    // if (signature !== expectedSignature) {
-    //    console.error("Invalid Webhook Signature!");
-    //    return res.status(401).send('Unauthorized');
-    // }
+    // 1. Verify HMAC Signature
+    if (HMAC_SECRET) {
+        const signature = req.headers['x-signature'];
+        const expectedSignature = crypto.createHmac('sha256', HMAC_SECRET)
+                                        .update(req.rawBody)
+                                        .digest('hex');
+                                        
+        if (signature !== expectedSignature) {
+           return res.status(401).send('Unauthorized - Signature Mismatch');
+        }
+    }
 
+    // 2. Extract Data
     const { sender, message, timestamp, device_model } = req.body;
-    console.log(`[${device_model}] Received SMS from ${sender}: ${message}`);
-    // Forward to Dashboard via Socket.io or save to MongoDB
-    res.status(200).send('OK');
+    
+    // 3. Decrypt Message (if AES is enabled)
+    const plainTextMessage = decryptMessage(message);
+
+    // 4. Process Logic
+    console.log(`[${device_model}] SMS from ${sender}: ${plainTextMessage}`);
+    
+    // 5. Respond quickly!
+    res.status(200).json({ status: "success" });
 });
 
 app.listen(8080, () => console.log('Listening on port 8080'));
 ```
+
+## 🏗️ Future Considerations: Building a Web Dashboard
+
+If you plan to build a complete website (Front-end + Back-end) to view these incoming SMS messages, keep these architectural requirements in mind:
+
+### 1. Database Choice & Schema
+*   **Database**: Use MongoDB (NoSQL) or PostgreSQL (SQL). MongoDB is great for flexible JSON payloads.
+*   **Schema Fields**: Store `_id`, `sender_number`, `message_body`, `device_model`, `received_timestamp`, `processed_at`, and `status`.
+*   **Indexes**: Create database indexes on `sender_number` and `received_timestamp` so your front-end can quickly load historical messages and filter by sender.
+
+### 2. Front-End Interface (React / Vue / Next.js)
+*   **Real-time Updates**: Since SMS Webhooks arrive asynchronously, consider implementing **WebSockets** (e.g., `Socket.io`) on your server. When your webhook endpoint receives a message, it can push an event to the Front-End, allowing the dashboard UI to update instantly without the user needing to refresh the page.
+*   **CORS Configuration**: Your back-end server must implement CORS (Cross-Origin Resource Sharing) policies allowing your Front-End domain to fetch the SMS data securely. *Note: Webhooks sent directly from the Android App do NOT require CORS, this is only for your Web Dashboard.*
+*   **Authentication**: Secure your Web Dashboard using JWT (JSON Web Tokens) or NextAuth to ensure nobody else can casually browse your incoming SMS messages.
+
+### 3. Queueing & Rate Limiting
+*   If your phone forwards hundreds of messages at once, your webhook server might get overwhelmed. Use a Message Queue like **Redis** or **RabbitMQ** to temporarily store incoming webhooks before writing them sequentially to your database.
+*   Set up Rate Limiting on your server (e.g., `express-rate-limit`) to prevent DDoS attacks against your public webhook URL. Wait to rate-limit slightly higher than your expected max SMS flow.
+
+---
 
 ## 📱 User Guide
 
@@ -165,13 +190,41 @@ Because this app can be used to forward critical information (like bank OTPs or 
 *   **Prevent Screen Capture**: When enabled, the app will request the Android OS to block all screenshots and screen recordings while the app is open. It also hides the app's contents in your recent multitasking menu. This ensures that no other app or user can spy on your forwarding rules. *(Note: You must restart the app after enabling this).*
 *   **Webhook Secret Key (HMAC)**: If you enter a secret key here, the app will generate a cryptographic `HMAC-SHA256` signature of the JSON payload and send it in the `X-Signature` HTTP header. Your server can use the same secret key to compute the hash and compare it. This guarantees that the webhook was sent by your phone and was not tampered with by an attacker.
 
+### 6. Tools & Quality of Life Features
+The Settings tab also includes a new **Tools & Extras** section:
+*   **Send Test Webhook**: Automatically push a mock payload to all configured webhook endpoints. Crucial for verifying connectivity and HMAC signatures during server development.
+*   **Request Battery Optimization Exemption**: Android's Doze mode may sleep apps running in the background. Clicking this ensures the SMS forwarder uses unrestricted battery to always intercept messages.
+*   **Export / Import Config**: Easily backup your settings and rules to a `.json` file, or restore them onto a new device instantly.
+
+### 7. Advanced Security & Integrations
+*   **End-to-End Encryption (AES-256)**: Secure your payloads before they even leave your phone. If an AES key is provided, the SMS message body is encrypted with `AES/CBC/PKCS5Padding` and encoded in Base64 before being sent to the webhook. Even if the HTTP transmission or server is compromised, the raw SMS data remains protected.
+*   **Custom Webhook Templates**: Send payloads directly to services like Discord, Slack, or custom APIs without writing a middleware server. By defining a template (e.g., `{"text": "{sender} sent: {message}"}`), you can arbitrarily transform the outbound JSON structure.
+*   **SMS Command System**: Control your phone remotely via SMS. Turn this on, text `STATUS` to your device's number, and it will auto-reply with its current Battery Percentage and Cellular Network condition. Useful for monitoring headless devices.
+
+
+## ⚙️ How It Works
+
+SMS Sync Pro operates entirely on your device via standard Android APIs, without routing your messages through any third-party infrastructure.
+
+1.  **Background Listener**: The app registers a `BroadcastReceiver` to listen for the `android.provider.Telephony.SMS_RECEIVED` intent. This means the Android OS automatically notifies the app the moment an SMS arrives, even if the app is closed.
+2.  **Foreground Service**: To prevent newer versions of Android from killing the background listener to save battery (Doze mode), the app runs a lightweight Foreground Service. This keeps the application process alive and guarantees high reliability.
+3.  **Rule Evaluation**: When an SMS arrives, the app queries its local SQLite database (Room) for all active forwarding rules. It then checks if the message body contains the specified keywords.
+4.  **Parallel Execution**: If multiple rules match, the forwarding actions (either sending a new SMS via `SmsManager` or firing an HTTP POST via `WorkManager`) are executed in parallel using Coroutines. This ensures one slow server doesn't delay other forwarded messages.
+5.  **Guaranteed Delivery (WorkManager)**: For Webhooks, the request is handed off to Android's `WorkManager`. If your phone momentarily loses 4G/5G connection right as the message arrives, WorkManager queues the payload and automatically fires it the exact second the phone reconnects to the internet.
+6.  **Local Logging**: Every action's status is logged into the local Room database, providing an instant audit trail in the app's UI.
+
 ## 🛠 Architecture & Tech Stack
 
-*   **Language:** Kotlin
-*   **UI Toolkit:** Jetpack Compose (Material Design 3)
-*   **Local Storage:** Room Database (SQLite abstraction) for maintaining Rules and Activity Logs.
-*   **Background Processing:** `BroadcastReceiver` listening for `android.provider.Telephony.SMS_RECEIVED`. Work is offloaded immediately to Coroutines (`Dispatchers.IO`) for fast parallel processing without blocking the main UI thread. Even when managing multiple webhooks at the same time, the messages are fired in parallel using Coroutine async jobs to prevent `BroadcastReceiver` ANR timeouts. A **Foreground Service** keeps the app process alive and prevents Doze mode on newer Android versions.
-*   **Networking:** Standard `HttpURLConnection` with strict timeouts (`8000ms`) for lightweight webhook delivery without heavy external dependencies or ANR risks.
+The application is built completely natively for Android using modern, robust tooling:
+
+*   **Language:** Kotlin (100% Kotlin codebase)
+*   **UI Toolkit:** Jetpack Compose (Kotlin declarative UI framework) utilizing Material Design 3 components.
+*   **Local Database:** Android Room (an abstraction layer over SQLite) with Coroutine Flow integration for reactive UI updates (e.g., the UI updates instantly when a new log is added in the background).
+*   **Background Jobs:** `WorkManager` for guaranteed, deferrable execution of webhooks. It handles exponential backoff and network-retry constraints natively.
+*   **Networking:** `HttpURLConnection` for lightweight webhook delivery without heavy external dependencies like Retrofit or Ktor, minimizing the APK size and ANR risks.
+*   **Asynchronicity:** Kotlin Coroutines (`Dispatchers.IO`) for fast, non-blocking I/O operations (database reads, network calls).
+*   **State Management:** ViewModels with `MutableStateFlow` to manage UI state cleanly and survive configuration changes.
+*   **Security:** Cryptographic `HMAC-SHA256` generation using `javax.crypto.Mac` for webhook signature verification. Flags such as `WindowManager.LayoutParams.FLAG_SECURE` are used to prevent unauthorized screen captures.
 
 ## 🔒 Security & Privacy
 

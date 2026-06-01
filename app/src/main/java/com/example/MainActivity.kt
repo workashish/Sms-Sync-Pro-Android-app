@@ -50,7 +50,15 @@ class MainActivity : ComponentActivity() {
         
         val settings = com.example.data.SettingsManager(this)
         if (settings.preventScreenCapture) {
-            window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+            // NOTE: Setting FLAG_SECURE breaks the streaming emulator's ability to display the app,
+            // resulting in "Channel is unrecoverably broken" errors. We catch/ignore it or comment it out for now.
+            try {
+                if (!Build.MODEL.contains("Emulator") && !Build.FINGERPRINT.contains("generic")) {
+                    window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
 
         enableEdgeToEdge()

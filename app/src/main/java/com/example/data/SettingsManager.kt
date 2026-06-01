@@ -29,4 +29,16 @@ class SettingsManager(context: Context) {
     var preventScreenCapture: Boolean
         get() = prefs.getBoolean("prevent_screen_capture", false)
         set(value) = prefs.edit().putBoolean("prevent_screen_capture", value).apply()
+
+    var aesEncryptionKey: String
+        get() = prefs.getString("aes_encryption_key", "") ?: ""
+        set(value) = prefs.edit().putString("aes_encryption_key", value).apply()
+
+    var customWebhookTemplate: String
+        get() = prefs.getString("custom_webhook_template", "") ?: ""
+        set(value) = prefs.edit().putString("custom_webhook_template", value).apply()
+
+    var enableSmsCommands: Boolean
+        get() = prefs.getBoolean("enable_sms_commands", false)
+        set(value) = prefs.edit().putBoolean("enable_sms_commands", value).apply()
 }
