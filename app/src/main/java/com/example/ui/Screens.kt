@@ -6,6 +6,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.ForwardingRule
@@ -83,25 +86,47 @@ fun MainScreen(viewModel: MainViewModel) {
         },
         bottomBar = {
             NavigationBar(
-                containerColor = com.example.ui.theme.PurpleSurfaceVariant
+                containerColor = com.example.ui.theme.PurpleSurface,
+                tonalElevation = 8.dp
             ) {
                 NavigationBarItem(
                     selected = selectedTabIndex == 0,
                     onClick = { selectedTabIndex = 0 },
-                    icon = { Text("📋") },
-                    label = { Text("Rules") }
+                    icon = { Icon(Icons.Default.Menu, contentDescription = "Rules") },
+                    label = { Text("Rules") },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = com.example.ui.theme.PurplePrimary,
+                        selectedTextColor = com.example.ui.theme.PurplePrimary,
+                        indicatorColor = com.example.ui.theme.PurpleSecondary,
+                        unselectedIconColor = com.example.ui.theme.PurpleText.copy(alpha = 0.5f),
+                        unselectedTextColor = com.example.ui.theme.PurpleText.copy(alpha = 0.5f)
+                    )
                 )
                 NavigationBarItem(
                     selected = selectedTabIndex == 1,
                     onClick = { selectedTabIndex = 1 },
-                    icon = { Text("📝") },
-                    label = { Text("Logs") }
+                    icon = { Icon(Icons.Default.List, contentDescription = "Logs") },
+                    label = { Text("Logs") },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = com.example.ui.theme.PurplePrimary,
+                        selectedTextColor = com.example.ui.theme.PurplePrimary,
+                        indicatorColor = com.example.ui.theme.PurpleSecondary,
+                        unselectedIconColor = com.example.ui.theme.PurpleText.copy(alpha = 0.5f),
+                        unselectedTextColor = com.example.ui.theme.PurpleText.copy(alpha = 0.5f)
+                    )
                 )
                 NavigationBarItem(
                     selected = selectedTabIndex == 2,
                     onClick = { selectedTabIndex = 2 },
-                    icon = { Text("⚙️") },
-                    label = { Text("Settings") }
+                    icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+                    label = { Text("Settings") },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = com.example.ui.theme.PurplePrimary,
+                        selectedTextColor = com.example.ui.theme.PurplePrimary,
+                        indicatorColor = com.example.ui.theme.PurpleSecondary,
+                        unselectedIconColor = com.example.ui.theme.PurpleText.copy(alpha = 0.5f),
+                        unselectedTextColor = com.example.ui.theme.PurpleText.copy(alpha = 0.5f)
+                    )
                 )
             }
         }
@@ -143,7 +168,7 @@ fun RulesList(viewModel: MainViewModel) {
                 }
             }
         } else {
-            items(rules) { rule ->
+            items(rules, key = { it.id }) { rule ->
                 RuleItem(
                     rule = rule,
                     onToggle = { id, isActive -> viewModel.toggleRule(id, isActive) },
@@ -319,6 +344,32 @@ fun SettingsList(viewModel: MainViewModel) {
     var aesEncryptionKey by remember { mutableStateOf(settings.aesEncryptionKey) }
     var customWebhookTemplate by remember { mutableStateOf(settings.customWebhookTemplate) }
     var enableSmsCommands by remember { mutableStateOf(settings.enableSmsCommands) }
+
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri?.let { 
+            scope.launch {
+                ExportImportManager(context).exportConfig(it)
+            }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let {
+            scope.launch {
+                ExportImportManager(context).importConfig(it)
+                // Reload settings locally so UI updates
+                globalEnable = settings.globalEnable
+                includeDeviceModel = settings.includeDeviceModel
+                retryFailedWebhooks = settings.retryFailedWebhooks
+                webhookTimeout = settings.webhookTimeout.toString()
+                webhookSecret = settings.webhookSecret
+                preventScreenCapture = settings.preventScreenCapture
+                aesEncryptionKey = settings.aesEncryptionKey
+                customWebhookTemplate = settings.customWebhookTemplate
+                enableSmsCommands = settings.enableSmsCommands
+            }
+        }
+    }
 
     LazyColumn(contentPadding = PaddingValues(16.dp)) {
         item {
@@ -588,32 +639,6 @@ fun SettingsList(viewModel: MainViewModel) {
                     Text("Tools & Extras", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = com.example.ui.theme.PurpleText)
                     Spacer(modifier = Modifier.height(12.dp))
                     
-                    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-                        uri?.let { 
-                            scope.launch {
-                                ExportImportManager(context).exportConfig(it)
-                            }
-                        }
-                    }
-
-                    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-                        uri?.let {
-                            scope.launch {
-                                ExportImportManager(context).importConfig(it)
-                                // Reload settings locally so UI updates
-                                globalEnable = settings.globalEnable
-                                includeDeviceModel = settings.includeDeviceModel
-                                retryFailedWebhooks = settings.retryFailedWebhooks
-                                webhookTimeout = settings.webhookTimeout.toString()
-                                webhookSecret = settings.webhookSecret
-                                preventScreenCapture = settings.preventScreenCapture
-                                aesEncryptionKey = settings.aesEncryptionKey
-                                customWebhookTemplate = settings.customWebhookTemplate
-                                enableSmsCommands = settings.enableSmsCommands
-                            }
-                        }
-                    }
-
                     Button(
                         onClick = {
                             scope.launch(Dispatchers.IO) {
@@ -622,8 +647,13 @@ fun SettingsList(viewModel: MainViewModel) {
                                 val webhookRules = rules.filter { it.type == "WEBHOOK" }
                                 
                                 if (webhookRules.isEmpty()) {
-                                    // Normally we show a toast, but this is background IO thread. Toasts crash.
+                                    scope.launch(Dispatchers.Main) {
+                                        android.widget.Toast.makeText(context, "No active Webhook rules found. Create one first.", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
                                 } else {
+                                    scope.launch(Dispatchers.Main) {
+                                        android.widget.Toast.makeText(context, "Sending test to ${webhookRules.size} webhook(s)... check Logs tab.", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
                                     webhookRules.forEach { rule ->
                                         val data = Data.Builder()
                                             .putString("url", rule.target)
@@ -633,13 +663,8 @@ fun SettingsList(viewModel: MainViewModel) {
                                             .putBoolean("isTest", false)
                                             .build()
 
-                                        val constraints = Constraints.Builder()
-                                            .setRequiredNetworkType(NetworkType.CONNECTED)
-                                            .build()
-
                                         val workRequest = OneTimeWorkRequestBuilder<WebhookWorker>()
                                             .setInputData(data)
-                                            .setConstraints(constraints)
                                             .build()
 
                                         WorkManager.getInstance(context).enqueue(workRequest)
@@ -656,13 +681,17 @@ fun SettingsList(viewModel: MainViewModel) {
                     
                     OutlinedButton(
                         onClick = {
-                            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                                data = Uri.parse("package:${context.packageName}")
-                            }
-                            try {
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                e.printStackTrace()
+                            if (android.os.Build.MODEL.contains("Emulator") && android.os.Build.FINGERPRINT.contains("generic")) {
+                                android.widget.Toast.makeText(context, "System settings not available in preview.", android.widget.Toast.LENGTH_SHORT).show()
+                            } else {
+                                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                    data = Uri.parse("package:${context.packageName}")
+                                }
+                                try {
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
                             }
                         },
                         modifier = Modifier.fillMaxWidth()
@@ -676,7 +705,11 @@ fun SettingsList(viewModel: MainViewModel) {
                         OutlinedButton(
                             onClick = { 
                                 try {
-                                    exportLauncher.launch("sms_sync_pro_config.json")
+                                    if (android.os.Build.MODEL.contains("Emulator") && android.os.Build.FINGERPRINT.contains("generic")) {
+                                        android.widget.Toast.makeText(context, "File picker not available in preview.", android.widget.Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        exportLauncher.launch("sms_sync_pro_config.json")
+                                    }
                                 } catch (e: Exception) {
                                     e.printStackTrace()
                                 }
@@ -689,7 +722,11 @@ fun SettingsList(viewModel: MainViewModel) {
                         OutlinedButton(
                             onClick = { 
                                 try {
-                                    importLauncher.launch(arrayOf("application/json"))
+                                    if (android.os.Build.MODEL.contains("Emulator") && android.os.Build.FINGERPRINT.contains("generic")) {
+                                        android.widget.Toast.makeText(context, "File picker not available in preview.", android.widget.Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        importLauncher.launch(arrayOf("application/json"))
+                                    }
                                 } catch (e: Exception) {
                                     e.printStackTrace()
                                 }
@@ -698,6 +735,25 @@ fun SettingsList(viewModel: MainViewModel) {
                         ) {
                             Text("Import Config")
                         }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Button(
+                        onClick = {
+                            val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                            intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(intent)
+                            if (context is android.app.Activity) {
+                                context.finish()
+                            }
+                            Runtime.getRuntime().exit(0)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Restart App")
                     }
                 }
             }

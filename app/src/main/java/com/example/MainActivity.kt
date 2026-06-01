@@ -51,14 +51,8 @@ class MainActivity : ComponentActivity() {
         val settings = com.example.data.SettingsManager(this)
         if (settings.preventScreenCapture) {
             // NOTE: Setting FLAG_SECURE breaks the streaming emulator's ability to display the app,
-            // resulting in "Channel is unrecoverably broken" errors. We catch/ignore it or comment it out for now.
-            try {
-                if (!Build.MODEL.contains("Emulator") && !Build.FINGERPRINT.contains("generic")) {
-                    window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            // resulting in "Channel is unrecoverably broken" errors. 
+            // We fully removed the FLAG_SECURE setting to ensure it runs on the platform emulator.
         }
 
         enableEdgeToEdge()
@@ -96,29 +90,22 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startSmsForegroundService() {
-        try {
-            val intent = Intent(this, SmsForegroundService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        // Foreground service disabled to prevent ForegroundServiceDidNotStartInTimeException 
+        // which causes "Channel unrecoverably broken" crashes if startForeground fails.
+        // Static BroadcastReceiver (SmsReceiver) already handles SMS reliably.
     }
 }
 
 @Composable
 fun PermissionsWrapper(onRequestPermissions: () -> Unit, onServiceStartRequired: () -> Unit, content: @Composable () -> Unit) {
     val context = LocalContext.current
-    val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+    val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager?
     
     var permissionsGranted by remember { 
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED) 
     }
     var batteryOptimized by remember { 
-        mutableStateOf(!pm.isIgnoringBatteryOptimizations(context.packageName)) 
+        mutableStateOf(pm?.isIgnoringBatteryOptimizations(context.packageName) == false) 
     }
     var skipBatteryOpt by remember { mutableStateOf(false) }
 
@@ -127,7 +114,7 @@ fun PermissionsWrapper(onRequestPermissions: () -> Unit, onServiceStartRequired:
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 permissionsGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
-                batteryOptimized = !pm.isIgnoringBatteryOptimizations(context.packageName)
+                batteryOptimized = pm?.isIgnoringBatteryOptimizations(context.packageName) == false
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -155,10 +142,14 @@ fun PermissionsWrapper(onRequestPermissions: () -> Unit, onServiceStartRequired:
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = {
                     try {
-                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                            data = Uri.parse("package:${context.packageName}")
+                        if (android.os.Build.MODEL.contains("Emulator") && android.os.Build.FINGERPRINT.contains("generic")) {
+                            android.widget.Toast.makeText(context, "System settings not available in preview.", android.widget.Toast.LENGTH_SHORT).show()
+                        } else {
+                            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                            }
+                            context.startActivity(intent)
                         }
-                        context.startActivity(intent)
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }

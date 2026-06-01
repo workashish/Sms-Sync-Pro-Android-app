@@ -40,6 +40,7 @@ class WebhookWorker(
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
             connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("User-Agent", "SmsForwarder/1.0")
             connection.connectTimeout = timeout
             connection.readTimeout = timeout
             connection.doOutput = true

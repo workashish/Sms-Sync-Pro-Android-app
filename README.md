@@ -199,7 +199,9 @@ The Settings tab also includes a new **Tools & Extras** section:
 ### 7. Advanced Security & Integrations
 *   **End-to-End Encryption (AES-256)**: Secure your payloads before they even leave your phone. If an AES key is provided, the SMS message body is encrypted with `AES/CBC/PKCS5Padding` and encoded in Base64 before being sent to the webhook. Even if the HTTP transmission or server is compromised, the raw SMS data remains protected.
 *   **Custom Webhook Templates**: Send payloads directly to services like Discord, Slack, or custom APIs without writing a middleware server. By defining a template (e.g., `{"text": "{sender} sent: {message}"}`), you can arbitrarily transform the outbound JSON structure.
-*   **SMS Command System**: Control your phone remotely via SMS. Turn this on, text `STATUS` to your device's number, and it will auto-reply with its current Battery Percentage and Cellular Network condition. Useful for monitoring headless devices.
+*   **SMS Command System**: Control your phone remotely via SMS. Turn this on, text `STATUS`, `LOCATION`, or `REBOOT` to your device's number.
+    *   `STATUS`: Auto-replies with the current Battery Percentage and Cellular Network condition. Useful for monitoring headless devices.
+    *   `LOCATION` & `REBOOT`: These commands are actively parsed but will currently return a "requires elevated permissions or root" message, as extending them requires explicit system-level integrations.
 
 
 ## ⚙️ How It Works

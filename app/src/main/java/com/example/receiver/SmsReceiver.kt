@@ -102,13 +102,8 @@ class SmsReceiver : BroadcastReceiver() {
                                 .putBoolean("isTest", false)
                                 .build()
 
-                            val constraints = Constraints.Builder()
-                                .setRequiredNetworkType(NetworkType.CONNECTED)
-                                .build()
-
                             val workRequest = OneTimeWorkRequestBuilder<WebhookWorker>()
                                 .setInputData(data)
-                                .setConstraints(constraints)
                                 // WorkManager internal backoff strategy
                                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
                                 .build()
