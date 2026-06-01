@@ -1,0 +1,6 @@
+{
+  "name": "SMS Sync Pro",
+  "description": "Forward incoming SMS messages to phone numbers, webhooks, and email APIs with advanced keyword filtering and logging.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
