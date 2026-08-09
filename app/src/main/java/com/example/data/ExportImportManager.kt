@@ -8,33 +8,34 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
+import dagger.hilt.android.qualifiers.ApplicationContext
 
-class ExportImportManager(private val context: Context) {
+class ExportImportManager @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val settings: SettingsDataStore,
+    private val smsDao: SmsDao
+) {
 
     suspend fun exportConfig(uri: Uri): Boolean = withContext(Dispatchers.IO) {
         try {
-            val settings = SettingsManager(context)
-            val db = AppDatabase.getDatabase(context)
-            val rules = db.smsDao().getActiveRules()
+            val rules = smsDao.getAllRulesNonFlow()
 
             val root = JSONObject()
             
-            // Settings
             val settingsJson = JSONObject().apply {
-                put("globalEnable", settings.globalEnable)
-                put("includeDeviceModel", settings.includeDeviceModel)
-                put("retryFailedWebhooks", settings.retryFailedWebhooks)
-                put("webhookTimeout", settings.webhookTimeout)
-                put("webhookSecret", settings.webhookSecret)
-                put("preventScreenCapture", settings.preventScreenCapture)
-                put("aesEncryptionKey", settings.aesEncryptionKey)
-                put("customWebhookTemplate", settings.customWebhookTemplate)
-                put("enableSmsCommands", settings.enableSmsCommands)
+                put("globalEnable", settings.globalEnable.first())
+                put("includeDeviceModel", settings.includeDeviceModel.first())
+                put("retryFailedWebhooks", settings.retryFailedWebhooks.first())
+                put("webhookTimeout", settings.webhookTimeout.first())
+                put("preventScreenCapture", settings.preventScreenCapture.first())
+                put("customWebhookTemplate", settings.customWebhookTemplate.first())
+                put("enableSmsCommands", settings.enableSmsCommands.first())
             }
             root.put("settings", settingsJson)
 
-            // Rules
             val rulesArray = JSONArray()
             rules.forEach { rule ->
                 val ruleJson = JSONObject().apply {
@@ -42,12 +43,12 @@ class ExportImportManager(private val context: Context) {
                     put("type", rule.type)
                     put("target", rule.target)
                     put("keywordFilter", rule.keywordFilter)
+                    put("isActive", rule.isActive)
                 }
                 rulesArray.put(ruleJson)
             }
             root.put("rules", rulesArray)
 
-            // Write to file
             context.contentResolver.openOutputStream(uri)?.use { outputStream ->
                 OutputStreamWriter(outputStream).use { writer ->
                     writer.write(root.toString(4))
@@ -70,36 +71,31 @@ class ExportImportManager(private val context: Context) {
 
             val root = JSONObject(jsonString)
 
-            // Settings
             if (root.has("settings")) {
                 val settingsJson = root.getJSONObject("settings")
-                val settings = SettingsManager(context)
-                if (settingsJson.has("globalEnable")) settings.globalEnable = settingsJson.getBoolean("globalEnable")
-                if (settingsJson.has("includeDeviceModel")) settings.includeDeviceModel = settingsJson.getBoolean("includeDeviceModel")
-                if (settingsJson.has("retryFailedWebhooks")) settings.retryFailedWebhooks = settingsJson.getBoolean("retryFailedWebhooks")
-                if (settingsJson.has("webhookTimeout")) settings.webhookTimeout = settingsJson.getInt("webhookTimeout")
-                if (settingsJson.has("webhookSecret")) settings.webhookSecret = settingsJson.getString("webhookSecret")
-                if (settingsJson.has("preventScreenCapture")) settings.preventScreenCapture = settingsJson.getBoolean("preventScreenCapture")
-                if (settingsJson.has("aesEncryptionKey")) settings.aesEncryptionKey = settingsJson.getString("aesEncryptionKey")
-                if (settingsJson.has("customWebhookTemplate")) settings.customWebhookTemplate = settingsJson.getString("customWebhookTemplate")
-                if (settingsJson.has("enableSmsCommands")) settings.enableSmsCommands = settingsJson.getBoolean("enableSmsCommands")
+                if (settingsJson.has("globalEnable")) settings.updateGlobalEnable(settingsJson.getBoolean("globalEnable"))
+                if (settingsJson.has("includeDeviceModel")) settings.updateIncludeDeviceModel(settingsJson.getBoolean("includeDeviceModel"))
+                if (settingsJson.has("retryFailedWebhooks")) settings.updateRetryFailedWebhooks(settingsJson.getBoolean("retryFailedWebhooks"))
+                if (settingsJson.has("webhookTimeout")) settings.updateWebhookTimeout(settingsJson.getInt("webhookTimeout"))
+                if (settingsJson.has("preventScreenCapture")) settings.updatePreventScreenCapture(settingsJson.getBoolean("preventScreenCapture"))
+                if (settingsJson.has("customWebhookTemplate")) settings.updateCustomWebhookTemplate(settingsJson.getString("customWebhookTemplate"))
+                if (settingsJson.has("enableSmsCommands")) settings.updateEnableSmsCommands(settingsJson.getBoolean("enableSmsCommands"))
             }
 
-            // Rules
             if (root.has("rules")) {
-                val db = AppDatabase.getDatabase(context)
-                // We keep existing rules and just add new ones, or delete existing?
-                // The prompt says "instantly restored", so we probably should add them.
-                // It's safer to avoid clearing. Let's just insert them.
                 val rulesArray = root.getJSONArray("rules")
                 for (i in 0 until rulesArray.length()) {
                     val r = rulesArray.getJSONObject(i)
-                    db.smsDao().insertRule(
+                    if (!r.has("name") || !r.has("type") || !r.has("target")) {
+                        continue // Basic schema validation
+                    }
+                    smsDao.insertRule(
                         ForwardingRule(
                             name = r.optString("name", "Imported Rule"),
                             type = r.optString("type", "WEBHOOK"),
                             target = r.optString("target", ""),
-                            keywordFilter = r.optString("keywordFilter", "")
+                            keywordFilter = r.optString("keywordFilter", ""),
+                            isActive = r.optBoolean("isActive", true)
                         )
                     )
                 }

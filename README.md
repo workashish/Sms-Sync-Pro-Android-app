@@ -60,16 +60,20 @@ If you are planning to build a custom website or endpoint to receive these webho
     *   Grab the raw, unmodified request body on your server.
     *   Compute an HMAC-SHA256 hash using your secret key.
     *   Compare the hash — if they don't match, reject the request with a `401`.
-8.  **AES-256 Decryption (CRITICAL)**: If you configure an **AES Encryption Key** in the app:
-    *   The `message` field in the JSON payload will *no longer* be plain text. Instead, it will be a Base64 encoded string containing the Initialization Vector (IV) and the Ciphertext.
-    *   Your server must base64 decode the string.
-    *   Extract the first 16 bytes. That is your `IV`.
-    *   The remaining bytes are the `ciphertext`.
-    *   Use a SHA-256 hash of your plaintext AES password as the actual 32-byte AES key.
-    *   Decrypt using `AES-256-CBC` algorithm.
+6.  **AES-256 Decryption (CRITICAL)**: If you configure an **AES Encryption Key** in the app:
+    *   The `message` field in the JSON payload will *no longer* be plain text. Instead, it will be a string containing the Salt, IV, and the Ciphertext separated by colons (`:`).
+    *   The string format is: `saltHex:ivHex:ciphertextHex`.
+    *   Your server must split the string by `:`.
+    *   Convert the hex strings to byte arrays.
+    *   Use PBKDF2 with HMAC-SHA256 (10000 iterations, 256-bit key) with the salt and your AES password to generate the secret key.
+    *   Decrypt the ciphertext using `AES-256-GCM` algorithm (NoPadding) with the derived key and IV.
+
+### Download
+
+The compiled APK can be found in the `/apk` directory of this repository (`/apk/sms-sync-pro.apk`).
 
 ### Node.js Example (Server-Side)
-Here is a complete, production-ready Express server that handles HMAC verification AND AES-256 decryption:
+Here is a complete, production-ready Express server that handles HMAC verification AND AES-256-GCM decryption:
 
 ```javascript
 const express = require('express');
@@ -82,20 +86,29 @@ const AES_PASSWORD = "YOUR_AES_PASSWORD";   // Must match "AES Encryption Key" i
 // Store raw body buffer for HMAC
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
 
-// AES-256 Decryption Helper
-function decryptMessage(base64Payload) {
-    if (!AES_PASSWORD) return base64Payload; // If not encrypted
+// AES-256-GCM Decryption Helper
+function decryptMessage(encryptedPayload) {
+    if (!AES_PASSWORD) return encryptedPayload;
     
     try {
-        const payloadBuffer = Buffer.from(base64Payload, 'base64');
-        const iv = payloadBuffer.subarray(0, 16); // First 16 bytes
-        const ciphertext = payloadBuffer.subarray(16);
+        const parts = encryptedPayload.split(':');
+        if (parts.length !== 3) return "INVALID_ENCRYPTION_FORMAT";
         
-        // Android app uses SHA-256 hash of the password as the 32-byte key
-        const key = crypto.createHash('sha256').update(AES_PASSWORD).digest();
+        const salt = Buffer.from(parts[0], 'hex');
+        const iv = Buffer.from(parts[1], 'hex');
+        const ciphertext = Buffer.from(parts[2], 'hex');
         
-        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
-        let decrypted = decipher.update(ciphertext, undefined, 'utf8');
+        const key = crypto.pbkdf2Sync(AES_PASSWORD, salt, 10000, 32, 'sha256');
+        
+        // In Node.js, the Auth Tag is the last 16 bytes of the ciphertext for GCM
+        const authTagLength = 16;
+        const actualCiphertext = ciphertext.subarray(0, ciphertext.length - authTagLength);
+        const authTag = ciphertext.subarray(ciphertext.length - authTagLength);
+        
+        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+        decipher.setAuthTag(authTag);
+        
+        let decrypted = decipher.update(actualCiphertext, undefined, 'utf8');
         decrypted += decipher.final('utf8');
         return decrypted;
     } catch (e) {

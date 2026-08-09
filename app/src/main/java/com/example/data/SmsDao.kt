@@ -11,6 +11,9 @@ interface SmsDao {
     // Rules
     @Query("SELECT * FROM forwarding_rules")
     fun getAllRules(): Flow<List<ForwardingRule>>
+
+    @Query("SELECT * FROM forwarding_rules")
+    suspend fun getAllRulesNonFlow(): List<ForwardingRule>
     
     @Query("SELECT * FROM forwarding_rules WHERE isActive = 1")
     suspend fun getActiveRules(): List<ForwardingRule>

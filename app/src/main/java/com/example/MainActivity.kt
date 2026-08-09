@@ -9,7 +9,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
-import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -37,31 +36,26 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.Lifecycle
 import com.example.service.SmsForegroundService
 import com.example.ui.MainScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.MainViewModel
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        val settings = com.example.data.SettingsManager(this)
-        if (settings.preventScreenCapture) {
-            // NOTE: Setting FLAG_SECURE breaks the streaming emulator's ability to display the app,
-            // resulting in "Channel is unrecoverably broken" errors. 
-            // We fully removed the FLAG_SECURE setting to ensure it runs on the platform emulator.
-        }
-
         enableEdgeToEdge()
 
         val requestPermissionLauncher = registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
-        ) { permissions ->
-            startSmsForegroundService()
-        }
+        ) { _ -> }
 
         setContent {
             MyApplicationTheme {
@@ -77,8 +71,7 @@ class MainActivity : ComponentActivity() {
                                 perms.add(Manifest.permission.POST_NOTIFICATIONS)
                             }
                             requestPermissionLauncher.launch(perms.toTypedArray())
-                        },
-                        onServiceStartRequired = { startSmsForegroundService() }
+                        }
                     ) {
                         MainScreen(viewModel = viewModel)
                     }
@@ -86,16 +79,10 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
-    private fun startSmsForegroundService() {
-        // Foreground service disabled to prevent ForegroundServiceDidNotStartInTimeException 
-        // which causes "Channel unrecoverably broken" crashes if startForeground fails.
-        // Static BroadcastReceiver (SmsReceiver) already handles SMS reliably.
-    }
 }
 
 @Composable
-fun PermissionsWrapper(onRequestPermissions: () -> Unit, onServiceStartRequired: () -> Unit, content: @Composable () -> Unit) {
+fun PermissionsWrapper(onRequestPermissions: () -> Unit, content: @Composable () -> Unit) {
     val context = LocalContext.current
     val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager?
     
@@ -107,18 +94,9 @@ fun PermissionsWrapper(onRequestPermissions: () -> Unit, onServiceStartRequired:
     }
     var skipBatteryOpt by remember { mutableStateOf(false) }
 
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                permissionsGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
-                batteryOptimized = pm?.isIgnoringBatteryOptimizations(context.packageName) == false
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        permissionsGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
+        batteryOptimized = pm?.isIgnoringBatteryOptimizations(context.packageName) == false
     }
 
     if (!permissionsGranted) {
@@ -126,9 +104,7 @@ fun PermissionsWrapper(onRequestPermissions: () -> Unit, onServiceStartRequired:
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
                 Text("SMS Sync Pro needs SMS & Notification permissions to run in the background gracefully.", textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = {
-                    onRequestPermissions()
-                }) {
+                Button(onClick = onRequestPermissions) {
                     Text("Grant Permissions")
                 }
             }
@@ -152,23 +128,18 @@ fun PermissionsWrapper(onRequestPermissions: () -> Unit, onServiceStartRequired:
                         e.printStackTrace()
                     }
                     skipBatteryOpt = true
-                    onServiceStartRequired()
                 }) {
                     Text("Disable Battery Optimization")
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 TextButton(onClick = { 
                     skipBatteryOpt = true
-                    onServiceStartRequired() 
                 }) {
                     Text("Skip for now")
                 }
             }
         }
     } else {
-        LaunchedEffect(Unit) {
-            onServiceStartRequired()
-        }
         content()
     }
 }

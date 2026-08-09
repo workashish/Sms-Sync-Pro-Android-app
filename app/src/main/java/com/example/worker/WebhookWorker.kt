@@ -2,22 +2,34 @@ package com.example.worker
 
 import android.content.Context
 import android.os.Build
+import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.Data
-import com.example.data.AppDatabase
+import com.example.data.SettingsDataStore
+import com.example.data.SmsDao
 import com.example.data.SmsLog
-import com.example.data.SettingsManager
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
+import kotlinx.coroutines.flow.first
 import org.json.JSONObject
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.SecureRandom
+import javax.crypto.Cipher
 import javax.crypto.Mac
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
-class WebhookWorker(
-    appContext: Context,
-    workerParams: WorkerParameters
+@HiltWorker
+class WebhookWorker @AssistedInject constructor(
+    @Assisted appContext: Context,
+    @Assisted workerParams: WorkerParameters,
+    private val settings: SettingsDataStore,
+    private val smsDao: SmsDao
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -27,9 +39,13 @@ class WebhookWorker(
         val ruleName = inputData.getString("ruleName") ?: "Manual Test"
         val isTest = inputData.getBoolean("isTest", false)
         
-        val settings = SettingsManager(applicationContext)
-        val deviceModel = if (settings.includeDeviceModel) Build.MODEL else "Unknown"
-        val timeout = settings.webhookTimeout * 1000
+        val includeDeviceModel = settings.includeDeviceModel.first()
+        val deviceModel = if (includeDeviceModel) Build.MODEL else "Unknown"
+        val timeout = settings.webhookTimeout.first() * 1000
+        val retryFailed = settings.retryFailedWebhooks.first()
+        val customTemplate = settings.customWebhookTemplate.first()
+        val aesEncryptionKey = settings.getAesEncryptionKey()
+        val webhookSecret = settings.getWebhookSecret()
 
         var success = false
         var exceptionMsg = ""
@@ -37,7 +53,10 @@ class WebhookWorker(
         try {
             success = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 var finalUrlString = urlString
-                if (!finalUrlString.startsWith("http://") && !finalUrlString.startsWith("https://")) {
+                if (!finalUrlString.startsWith("https://")) {
+                    if (finalUrlString.startsWith("http://")) {
+                        throw IllegalArgumentException("Only HTTPS is supported for Webhooks")
+                    }
                     finalUrlString = "https://$finalUrlString"
                 }
                 val url = URL(finalUrlString)
@@ -51,16 +70,31 @@ class WebhookWorker(
                 connection.doOutput = true
 
                 var finalMessage = message
-                if (settings.aesEncryptionKey.isNotEmpty()) {
-                    finalMessage = encryptAes(message, settings.aesEncryptionKey)
+                if (aesEncryptionKey.isNotEmpty()) {
+                    finalMessage = encryptAesGcm(message, aesEncryptionKey)
                 }
 
-                val jsonOutput = if (settings.customWebhookTemplate.isNotBlank()) {
-                    settings.customWebhookTemplate
-                        .replace("{sender}", JSONObject.quote(sender).removeSurrounding("\""))
-                        .replace("{message}", JSONObject.quote(finalMessage).removeSurrounding("\""))
-                        .replace("{body}", JSONObject.quote(finalMessage).removeSurrounding("\""))
-                        .replace("{device_model}", JSONObject.quote(deviceModel).removeSurrounding("\""))
+                val jsonOutput = if (customTemplate.isNotBlank()) {
+                    val jsonObj = try { JSONObject(customTemplate) } catch(e: Exception) { JSONObject() }
+                    
+                    val keys = jsonObj.keys()
+                    while(keys.hasNext()) {
+                        val k = keys.next()
+                        val v = jsonObj.optString(k)
+                        if (v.contains("{sender}")) jsonObj.put(k, v.replace("{sender}", sender))
+                        if (v.contains("{message}")) jsonObj.put(k, v.replace("{message}", finalMessage))
+                        if (v.contains("{body}")) jsonObj.put(k, v.replace("{body}", finalMessage))
+                        if (v.contains("{device_model}")) jsonObj.put(k, v.replace("{device_model}", deviceModel))
+                    }
+                    if (jsonObj.length() == 0) {
+                        customTemplate
+                            .replace("{sender}", JSONObject.quote(sender).removeSurrounding("\""))
+                            .replace("{message}", JSONObject.quote(finalMessage).removeSurrounding("\""))
+                            .replace("{body}", JSONObject.quote(finalMessage).removeSurrounding("\""))
+                            .replace("{device_model}", JSONObject.quote(deviceModel).removeSurrounding("\""))
+                    } else {
+                        jsonObj.toString()
+                    }
                 } else {
                     val lowerMsg = message.lowercase()
                     val isOtpWord = lowerMsg.contains("code") || lowerMsg.contains("otp") || lowerMsg.contains("2fa") || lowerMsg.contains("verification")
@@ -95,7 +129,7 @@ class WebhookWorker(
                                 metaObj.put("amount", amountMatcher.value.replace("$", "").trim())
                             }
                         }
-                        if (settings.includeDeviceModel) {
+                        if (includeDeviceModel) {
                             metaObj.put("device_model", deviceModel)
                         }
                         if (metaObj.length() > 0) {
@@ -104,8 +138,8 @@ class WebhookWorker(
                     }.toString().replace("\\/", "/")
                 }
 
-                if (settings.webhookSecret.isNotEmpty()) {
-                    val signature = generateHmacSha256(jsonOutput, settings.webhookSecret)
+                if (webhookSecret.isNotEmpty()) {
+                    val signature = generateHmacSha256(jsonOutput, webhookSecret)
                     if (signature.isNotEmpty()) {
                         connection.setRequestProperty("x-hmac-signature", signature)
                     }
@@ -125,7 +159,6 @@ class WebhookWorker(
                     val errorStream = connection.errorStream
                     var errorBody = errorStream?.bufferedReader()?.use { it.readText() }?.trim() ?: ""
                     
-                    // If error is HTML (common for 404s/500s from web servers), strip it or suppress it
                     if (errorBody.contains("<html", ignoreCase = true) || errorBody.contains("<!doctype", ignoreCase = true)) {
                         errorBody = "Server returned HTML page instead of API response. Please check if your Webhook URL is correct."
                     } else if (errorBody.length > 250) {
@@ -138,7 +171,7 @@ class WebhookWorker(
                         400 -> "400 Bad Request"
                         else -> "$responseCode"
                     }
-                    exceptionMsg = "HTTP Error: $statusText - $errorBody\nPayload Sent: $jsonOutput"
+                    exceptionMsg = "HTTP Error: $statusText - $errorBody"
                 }
                 connection.disconnect()
                 isSuccess
@@ -148,27 +181,23 @@ class WebhookWorker(
         }
 
         if (!isTest) {
-            val db = AppDatabase.getDatabase(applicationContext)
-            
             if (success) {
-                db.smsDao().insertLog(
+                smsDao.insertLog(
                     SmsLog(sender = sender, message = message, ruleName = ruleName, target = urlString, status = "SUCCESS")
                 )
                 return Result.success()
             } else {
-                if (runAttemptCount < 3 && settings.retryFailedWebhooks) {
+                if (runAttemptCount < 3 && retryFailed) {
                     return Result.retry()
                 } else {
-                    db.smsDao().insertLog(
+                    smsDao.insertLog(
                         SmsLog(sender = sender, message = message, ruleName = ruleName, target = urlString, status = "FAILED: $exceptionMsg")
                     )
                     return Result.failure()
                 }
             }
         } else {
-            // Test webhook: insert DB log so user can see it in Logs tab.
-            val db = AppDatabase.getDatabase(applicationContext)
-            db.smsDao().insertLog(
+            smsDao.insertLog(
                 SmsLog(sender = sender, message = message, ruleName = ruleName, target = urlString, status = if (success) "SUCCESS" else "FAILED: $exceptionMsg")
             )
             return if (success) Result.success() else Result.failure(Data.Builder().putString("error", exceptionMsg).build())
@@ -187,19 +216,27 @@ class WebhookWorker(
         }
     }
 
-    private fun encryptAes(data: String, key: String): String {
-        return try {
-            val secretKey = SecretKeySpec(java.security.MessageDigest.getInstance("SHA-256").digest(key.toByteArray(Charsets.UTF_8)), "AES")
-            val cipher = javax.crypto.Cipher.getInstance("AES/CBC/PKCS5Padding")
-            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, secretKey)
-            val iv = cipher.iv
-            val ciphertext = cipher.doFinal(data.toByteArray(Charsets.UTF_8))
-            val ivHex = iv.joinToString("") { "%02x".format(it) }
-            val cipherHex = ciphertext.joinToString("") { "%02x".format(it) }
-            "$ivHex:$cipherHex"
-        } catch (e: Exception) {
-            "ENCRYPTION_FAILED"
-        }
+    private fun encryptAesGcm(data: String, key: String): String {
+        // PBKDF2 with HMAC-SHA256
+        val salt = ByteArray(16)
+        SecureRandom().nextBytes(salt)
+        val spec = PBEKeySpec(key.toCharArray(), salt, 10000, 256)
+        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+        val secretKey = SecretKeySpec(factory.generateSecret(spec).encoded, "AES")
+
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        val iv = ByteArray(12)
+        SecureRandom().nextBytes(iv)
+        val gcmSpec = GCMParameterSpec(128, iv)
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, gcmSpec)
+        
+        val ciphertext = cipher.doFinal(data.toByteArray(Charsets.UTF_8))
+        
+        val saltHex = salt.joinToString("") { "%02x".format(it) }
+        val ivHex = iv.joinToString("") { "%02x".format(it) }
+        val cipherHex = ciphertext.joinToString("") { "%02x".format(it) }
+        
+        return "$saltHex:$ivHex:$cipherHex"
     }
 }
 

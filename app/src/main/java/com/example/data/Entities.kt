@@ -14,7 +14,10 @@ data class SmsLog(
     val status: String // "SUCCESS", "FAILED"
 )
 
-@Entity(tableName = "forwarding_rules")
+@Entity(
+    tableName = "forwarding_rules",
+    indices = [androidx.room.Index(value = ["isActive", "type"])]
+)
 data class ForwardingRule(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val name: String,

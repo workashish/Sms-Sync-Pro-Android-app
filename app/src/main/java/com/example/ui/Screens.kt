@@ -372,43 +372,32 @@ fun LogItem(log: SmsLog, isLast: Boolean) {
 
 @Composable
 fun SettingsList(viewModel: MainViewModel) {
-    val settings = viewModel.settingsManager
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var globalEnable by remember { mutableStateOf(settings.globalEnable) }
-    var includeDeviceModel by remember { mutableStateOf(settings.includeDeviceModel) }
-    var webhookTimeout by remember { mutableStateOf(settings.webhookTimeout.toString()) }
-    var retryFailedWebhooks by remember { mutableStateOf(settings.retryFailedWebhooks) }
-    var webhookSecret by remember { mutableStateOf(settings.webhookSecret) }
-    var preventScreenCapture by remember { mutableStateOf(settings.preventScreenCapture) }
-    var aesEncryptionKey by remember { mutableStateOf(settings.aesEncryptionKey) }
-    var customWebhookTemplate by remember { mutableStateOf(settings.customWebhookTemplate) }
-    var enableSmsCommands by remember { mutableStateOf(settings.enableSmsCommands) }
+    val globalEnable by viewModel.settings.globalEnable.collectAsStateWithLifecycle(initialValue = true)
+    val includeDeviceModel by viewModel.settings.includeDeviceModel.collectAsStateWithLifecycle(initialValue = true)
+    val webhookTimeout by viewModel.settings.webhookTimeout.collectAsStateWithLifecycle(initialValue = 8)
+    val retryFailedWebhooks by viewModel.settings.retryFailedWebhooks.collectAsStateWithLifecycle(initialValue = false)
+    val webhookSecret by viewModel.settings.webhookSecretFlow.collectAsStateWithLifecycle()
+    val preventScreenCapture by viewModel.settings.preventScreenCapture.collectAsStateWithLifecycle(initialValue = false)
+    val aesEncryptionKey by viewModel.settings.aesEncryptionKeyFlow.collectAsStateWithLifecycle()
+    val customWebhookTemplate by viewModel.settings.customWebhookTemplate.collectAsStateWithLifecycle(initialValue = "")
+    val enableSmsCommands by viewModel.settings.enableSmsCommands.collectAsStateWithLifecycle(initialValue = false)
+    val captureRcs by viewModel.settings.captureRcs.collectAsStateWithLifecycle(initialValue = false)
+    val updateUrl by viewModel.settings.updateUrl.collectAsStateWithLifecycle(initialValue = "")
+    val updateInfo by viewModel.updateInfo.collectAsStateWithLifecycle()
+    val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsStateWithLifecycle()
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         uri?.let { 
-            scope.launch {
-                ExportImportManager(context).exportConfig(it)
-            }
+            viewModel.exportConfig(it)
         }
     }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let {
-            scope.launch {
-                ExportImportManager(context).importConfig(it)
-                // Reload settings locally so UI updates
-                globalEnable = settings.globalEnable
-                includeDeviceModel = settings.includeDeviceModel
-                retryFailedWebhooks = settings.retryFailedWebhooks
-                webhookTimeout = settings.webhookTimeout.toString()
-                webhookSecret = settings.webhookSecret
-                preventScreenCapture = settings.preventScreenCapture
-                aesEncryptionKey = settings.aesEncryptionKey
-                customWebhookTemplate = settings.customWebhookTemplate
-                enableSmsCommands = settings.enableSmsCommands
-            }
+            viewModel.importConfig(it)
         }
     }
 
@@ -522,11 +511,10 @@ fun SettingsList(viewModel: MainViewModel) {
                     Text("Webhook Timeout (Seconds)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
-                        value = webhookTimeout,
+                        value = webhookTimeout.toString(),
                         onValueChange = { 
-                            webhookTimeout = it
                             it.toIntOrNull()?.let { timeout ->
-                                settings.webhookTimeout = timeout
+                                viewModel.updateWebhookTimeout(timeout)
                             }
                         },
                         singleLine = true,
@@ -616,8 +604,7 @@ fun SettingsList(viewModel: MainViewModel) {
                     OutlinedTextField(
                         value = webhookSecret,
                         onValueChange = { 
-                            webhookSecret = it
-                            settings.webhookSecret = it
+                            viewModel.updateWebhookSecret(it)
                         },
                         singleLine = true,
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
@@ -646,8 +633,7 @@ fun SettingsList(viewModel: MainViewModel) {
                     OutlinedTextField(
                         value = aesEncryptionKey,
                         onValueChange = { 
-                            aesEncryptionKey = it
-                            settings.aesEncryptionKey = it
+                            viewModel.updateAesEncryptionKey(it)
                         },
                         singleLine = true,
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
@@ -676,8 +662,7 @@ fun SettingsList(viewModel: MainViewModel) {
                     OutlinedTextField(
                         value = customWebhookTemplate,
                         onValueChange = { 
-                            customWebhookTemplate = it
-                            settings.customWebhookTemplate = it
+                            viewModel.updateCustomWebhookTemplate(it)
                         },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 3,
@@ -712,10 +697,95 @@ fun SettingsList(viewModel: MainViewModel) {
                     Switch(
                         checked = enableSmsCommands,
                         onCheckedChange = { 
-                            enableSmsCommands = it
-                            settings.enableSmsCommands = it
+                            viewModel.updateEnableSmsCommands(it)
                         }
                     )
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Capture RCS Messages", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("Requires Notification Access permission. Captures incoming messages from default messaging apps.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Switch(
+                        checked = captureRcs,
+                        onCheckedChange = { 
+                            if (it) {
+                                // Request Notification Access
+                                context.startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                            }
+                            viewModel.updateCaptureRcs(it)
+                        }
+                    )
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                ) {
+                    Text("Updates", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    OutlinedTextField(
+                        value = updateUrl,
+                        onValueChange = { 
+                            viewModel.updateUpdateUrl(it)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Update API URL (JSON or GitHub Releases)") },
+                        textStyle = MaterialTheme.typography.bodyMedium,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Check a URL for updates. Set to your custom endpoint.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = { viewModel.checkForUpdate() },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isCheckingUpdate && updateUrl.isNotBlank()
+                    ) {
+                        Text(if (isCheckingUpdate) "Checking..." else "Check for Updates")
+                    }
+
+                    updateInfo?.let { info ->
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text("New Update Available: ${info.versionName}", style = MaterialTheme.typography.titleSmall)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(info.releaseNotes, style = MaterialTheme.typography.bodySmall)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = { viewModel.downloadUpdate(info.downloadUrl, info.versionName) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Download & Install")
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
