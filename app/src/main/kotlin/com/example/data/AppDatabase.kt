@@ -9,7 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-@Database(entities = [SmsLog::class, ForwardingRule::class], version = 2, exportSchema = true)
+@Database(entities = [SmsLog::class, ForwardingRule::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun smsDao(): SmsDao
 
