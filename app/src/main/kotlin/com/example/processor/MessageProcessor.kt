@@ -126,6 +126,7 @@ class MessageProcessor @Inject constructor(
             }
         }
     }
+}
     
     private fun forwardViaSms(context: Context, target: String, message: String) {
         val smsManager = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {

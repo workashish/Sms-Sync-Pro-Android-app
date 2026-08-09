@@ -429,8 +429,7 @@ fun SettingsList(viewModel: MainViewModel) {
                     Switch(
                         checked = globalEnable,
                         onCheckedChange = { 
-                            globalEnable = it
-                            settings.globalEnable = it
+                            viewModel.updateGlobalEnable(it)
                         }
                     )
                 }
@@ -459,8 +458,7 @@ fun SettingsList(viewModel: MainViewModel) {
                     Switch(
                         checked = includeDeviceModel,
                         onCheckedChange = { 
-                            includeDeviceModel = it
-                            settings.includeDeviceModel = it
+                            viewModel.updateIncludeDeviceModel(it)
                         }
                     )
                 }
@@ -489,8 +487,7 @@ fun SettingsList(viewModel: MainViewModel) {
                     Switch(
                         checked = retryFailedWebhooks,
                         onCheckedChange = { 
-                            retryFailedWebhooks = it
-                            settings.retryFailedWebhooks = it
+                            viewModel.updateRetryFailedWebhooks(it)
                         }
                     )
                 }
@@ -550,8 +547,7 @@ fun SettingsList(viewModel: MainViewModel) {
                     Switch(
                         checked = preventScreenCapture,
                         onCheckedChange = { 
-                            preventScreenCapture = it
-                            settings.preventScreenCapture = it
+                            viewModel.updatePreventScreenCapture(it)
                         }
                     )
                 }
