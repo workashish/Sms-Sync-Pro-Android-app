@@ -739,28 +739,10 @@ fun SettingsList(viewModel: MainViewModel) {
                     Text("Updates", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    OutlinedTextField(
-                        value = updateUrl,
-                        onValueChange = { 
-                            viewModel.updateUpdateUrl(it)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text("Update API URL (JSON or GitHub Releases)") },
-                        textStyle = MaterialTheme.typography.bodyMedium,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Check a URL for updates. Set to your custom endpoint.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = { viewModel.checkForUpdate() },
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = !isCheckingUpdate && updateUrl.isNotBlank()
+                        enabled = !isCheckingUpdate
                     ) {
                         Text(if (isCheckingUpdate) "Checking..." else "Check for Updates")
                     }
@@ -949,10 +931,16 @@ fun AddRuleDialog(onDismiss: () -> Unit, onAdd: (String, String, String, String)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(selected = type == "SMS", onClick = { type = "SMS" })
+                    RadioButton(selected = type == "SMS", onClick = { 
+                        type = "SMS"
+                        if (target.startsWith("http")) target = "" 
+                    })
                     Text("SMS Target")
                     Spacer(modifier = Modifier.width(8.dp))
-                    RadioButton(selected = type == "WEBHOOK", onClick = { type = "WEBHOOK" })
+                    RadioButton(selected = type == "WEBHOOK", onClick = { 
+                        type = "WEBHOOK"
+                        if (target.isBlank()) target = "https://"
+                    })
                     Text("Webhook Target")
                 }
                 Spacer(modifier = Modifier.height(8.dp))
