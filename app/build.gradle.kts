@@ -1,6 +1,7 @@
 plugins {
   alias(libs.plugins.android.application)
   id("org.jetbrains.kotlin.android")
+  kotlin("kapt")
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.secrets)
@@ -34,8 +35,6 @@ android {
       storePassword = "android"
       keyAlias = "androiddebugkey"
       keyPassword = "android"
-      enableV1Signing = true
-      enableV2Signing = true
     }
   }
 
@@ -102,8 +101,8 @@ dependencies {
   implementation(libs.hilt.android)
   implementation(libs.hilt.navigation.compose)
   implementation(libs.hilt.work)
-  ksp(libs.hilt.compiler)
-  ksp(libs.hilt.ext.compiler)
+  kapt(libs.hilt.compiler)
+  kapt(libs.hilt.ext.compiler)
 
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)

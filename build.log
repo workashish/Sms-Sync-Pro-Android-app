@@ -1,0 +1,538 @@
+Initialized native services in: /opt/gradle/.gradle/native
+Initialized jansi services in: /opt/gradle/.gradle/native
+The client will now receive all logging from the daemon (pid: 3021). The daemon log file: /opt/gradle/.gradle/daemon/9.3.1/daemon-3021.out.log
+Starting 11th build in daemon [uptime: 25 mins 57.122 secs, performance: 97%, GC rate: 0.00/s, heap usage: 0% of 4 GiB]
+Using 4 worker leases.
+Operational build model parameters: {requiresToolingModels=false, parallelProjectExecution=true, configureOnDemand=false, configurationCache=true, configurationCacheParallelStore=false, configurationCacheParallelLoad=true, isolatedProjects=false, parallelProjectConfiguration=false, intermediateModelCache=false, parallelToolingApiActions=true, invalidateCoupledProjects=false, modelAsProjectDependency=false, resilientModelBuilding=false}
+Encryption key source: default Gradle keystore (pkcs12)
+Reusing configuration cache.
+Watching the file system is configured to be enabled if available
+Unable to list file systems to check whether they can be watched. Disabling watching. Reason: Could not query file systems: could not open mount file (errno 2: No such file or directory)
+File system watching is inactive
+Using local directory build cache for the root build (location = /opt/gradle/.gradle/caches/build-cache-1, remove unused entries = after 7 days).
+Tasks to be executed: [task ':app:clean', task ':app:preBuild', task ':app:preDebugBuild', task ':app:mergeDebugNativeDebugMetadata', task ':app:checkKotlinGradlePluginConfigurationErrors', task ':app:generateDebugBuildConfig', task ':app:checkDebugAarMetadata', task ':app:generateDebugResValues', task ':app:mapDebugSourceSetPaths', task ':app:generateDebugResources', task ':app:mergeDebugResources', task ':app:packageDebugResources', task ':app:parseDebugLocalResources', task ':app:createDebugCompatibleScreenManifests', task ':app:extractDeepLinksDebug', task ':app:processDebugMainManifest', task ':app:processDebugManifest', task ':app:processDebugManifestForPackage', task ':app:processDebugResources', task ':app:kspDebugKotlin', task ':app:compileDebugKotlin', task ':app:javaPreCompileDebug', task ':app:compileDebugJavaWithJavac', task ':app:mergeDebugShaders', task ':app:compileDebugShaders', task ':app:generateDebugAssets', task ':app:mergeDebugAssets', task ':app:compressDebugAssets', task ':app:hiltAggregateDepsDebug', task ':app:hiltJavaCompileDebug', task ':app:processDebugJavaRes', task ':app:mergeDebugJavaResource', task ':app:checkDebugDuplicateClasses', task ':app:desugarDebugFileDependencies', task ':app:mergeExtDexDebug', task ':app:mergeLibDexDebug', task ':app:transformDebugClassesWithAsm', task ':app:dexBuilderDebug', task ':app:mergeProjectDexDebug', task ':app:mergeDebugJniLibFolders', task ':app:mergeDebugNativeLibs', task ':app:stripDebugDebugSymbols', task ':app:validateSigningDebug', task ':app:writeDebugAppMetadata', task ':app:writeDebugSigningConfigVersions', task ':app:packageDebug', task ':app:createDebugApkListingFileRedirect', task ':app:assembleDebug']
+Tasks that were excluded: []
+Resolve mutations for :app:preBuild (Thread[#521,Execution worker Thread 2,5,main]) started.
+Resolve mutations for :app:clean (Thread[#520,Execution worker,5,main]) started.
+Resolve mutations for :app:checkKotlinGradlePluginConfigurationErrors (Thread[#519,included builds,5,main]) started.
+:app:preBuild (Thread[#521,Execution worker Thread 2,5,main]) started.
+:app:checkKotlinGradlePluginConfigurationErrors (Thread[#519,included builds,5,main]) started.
+:app:clean (Thread[#520,Execution worker,5,main]) started.
+destroyer locations for task group 0 (Thread[#522,Execution worker Thread 3,5,main]) started.
+
+> Task :app:preBuild UP-TO-DATE
+Skipping task ':app:preBuild' as it has no actions.
+Resolve mutations for :app:preDebugBuild (Thread[#521,Execution worker Thread 2,5,main]) started.
+:app:preDebugBuild (Thread[#521,Execution worker Thread 2,5,main]) started.
+
+> Task :app:preDebugBuild UP-TO-DATE
+Skipping task ':app:preDebugBuild' as it has no actions.
+Resolve mutations for :app:mergeDebugNativeDebugMetadata (Thread[#521,Execution worker Thread 2,5,main]) started.
+Resolve mutations for :app:generateDebugBuildConfig (Thread[#521,Execution worker Thread 2,5,main]) started.
+Resolve mutations for :app:checkDebugAarMetadata (Thread[#521,Execution worker Thread 2,5,main]) started.
+Resolve mutations for :app:generateDebugResValues (Thread[#522,Execution worker Thread 3,5,main]) started.
+Resolve mutations for :app:createDebugCompatibleScreenManifests (Thread[#521,Execution worker Thread 2,5,main]) started.
+Resolve mutations for :app:javaPreCompileDebug (Thread[#522,Execution worker Thread 3,5,main]) started.
+Resolve mutations for :app:mergeDebugShaders (Thread[#522,Execution worker Thread 3,5,main]) started.
+Resolve mutations for :app:checkDebugDuplicateClasses (Thread[#521,Execution worker Thread 2,5,main]) started.
+Resolve mutations for :app:desugarDebugFileDependencies (Thread[#522,Execution worker Thread 3,5,main]) started.
+Resolve mutations for :app:mergeDebugJniLibFolders (Thread[#521,Execution worker Thread 2,5,main]) started.
+Resolve mutations for :app:validateSigningDebug (Thread[#521,Execution worker Thread 2,5,main]) started.
+Resolve mutations for :app:writeDebugAppMetadata (Thread[#521,Execution worker Thread 2,5,main]) started.
+Resolve mutations for :app:writeDebugSigningConfigVersions (Thread[#521,Execution worker Thread 2,5,main]) started.
+
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+Skipping task ':app:checkKotlinGradlePluginConfigurationErrors' as task onlyIf 'errorDiagnostics are present' is false.
+
+> Task :app:clean
+Caching disabled for task ':app:clean' because:
+  Deletion cannot be cached
+Task ':app:clean' is not up-to-date because:
+  Task has not declared any outputs despite executing actions.
+:app:mergeDebugNativeDebugMetadata (Thread[#520,Execution worker,5,main]) started.
+:app:generateDebugBuildConfig (Thread[#519,included builds,5,main]) started.
+:app:generateDebugResValues (Thread[#522,Execution worker Thread 3,5,main]) started.
+:app:checkDebugAarMetadata (Thread[#521,Execution worker Thread 2,5,main]) started.
+
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+Skipping task ':app:mergeDebugNativeDebugMetadata' as it has no source files and no previous output files.
+:app:createDebugCompatibleScreenManifests (Thread[#520,Execution worker,5,main]) started.
+
+> Task :app:createDebugCompatibleScreenManifests
+Caching disabled for task ':app:createDebugCompatibleScreenManifests' because:
+  Caching has been disabled for the task
+Task ':app:createDebugCompatibleScreenManifests' is not up-to-date because:
+  Output property 'outputFolder' file /app/applet/app/build/intermediates/compatible_screen_manifest/debug/createDebugCompatibleScreenManifests has been removed.
+  Output property 'outputFolder' file /app/applet/app/build/intermediates/compatible_screen_manifest/debug/createDebugCompatibleScreenManifests/output-metadata.json has been removed.
+:app:javaPreCompileDebug (Thread[#520,Execution worker,5,main]) started.
+
+> Task :app:generateDebugBuildConfig FROM-CACHE
+Build cache key for task ':app:generateDebugBuildConfig' is f5c8ee0a93c089c5d7269609a66f159d
+Task ':app:generateDebugBuildConfig' is not up-to-date because:
+  Value of input property 'items' has changed for task ':app:generateDebugBuildConfig'
+Loaded cache entry for task ':app:generateDebugBuildConfig' with cache key f5c8ee0a93c089c5d7269609a66f159d
+:app:mergeDebugShaders (Thread[#519,included builds,5,main]) started.
+
+> Task :app:generateDebugResValues FROM-CACHE
+Build cache key for task ':app:generateDebugResValues' is 4378b15715f9003253a062e2f32a27f8
+Task ':app:generateDebugResValues' is not up-to-date because:
+  Output property 'outputDirectory' file /app/applet/app/build/generated/res/resValues/debug has been removed.
+Loaded cache entry for task ':app:generateDebugResValues' with cache key 4378b15715f9003253a062e2f32a27f8
+Resolve mutations for :app:mapDebugSourceSetPaths (Thread[#522,Execution worker Thread 3,5,main]) started.
+:app:mapDebugSourceSetPaths (Thread[#522,Execution worker Thread 3,5,main]) started.
+
+> Task :app:mergeDebugShaders
+Caching disabled for task ':app:mergeDebugShaders' because:
+  Simple merging task
+Task ':app:mergeDebugShaders' is not up-to-date because:
+  Output property 'outputDir' file /app/applet/app/build/intermediates/merged_shaders/debug/mergeDebugShaders/out has been removed.
+The input changes require a full rebuild for incremental task ':app:mergeDebugShaders'.
+Resolve mutations for :app:generateDebugResources (Thread[#519,included builds,5,main]) started.
+:app:generateDebugResources (Thread[#519,included builds,5,main]) started.
+
+> Task :app:javaPreCompileDebug FROM-CACHE
+Build cache key for task ':app:javaPreCompileDebug' is 0b354aec4b59146da90ae593bcad7679
+Task ':app:javaPreCompileDebug' is not up-to-date because:
+  Output property 'annotationProcessorListFile' file /app/applet/app/build/intermediates/annotation_processor_list/debug/javaPreCompileDebug/annotationProcessors.json has been removed.
+Loaded cache entry for task ':app:javaPreCompileDebug' with cache key 0b354aec4b59146da90ae593bcad7679
+Resolve mutations for :app:extractDeepLinksDebug (Thread[#520,Execution worker,5,main]) started.
+:app:extractDeepLinksDebug (Thread[#520,Execution worker,5,main]) started.
+
+> Task :app:extractDeepLinksDebug FROM-CACHE
+Build cache key for task ':app:extractDeepLinksDebug' is 41ba6e5523fdd0e74d046ec023c6c0f0
+Task ':app:extractDeepLinksDebug' is not up-to-date because:
+  Value of input property 'manifestPlaceholders' has changed for task ':app:extractDeepLinksDebug'
+Loaded cache entry for task ':app:extractDeepLinksDebug' with cache key 41ba6e5523fdd0e74d046ec023c6c0f0
+Resolve mutations for :app:processDebugMainManifest (Thread[#520,Execution worker,5,main]) started.
+:app:processDebugMainManifest (Thread[#520,Execution worker,5,main]) started.
+
+> Task :app:generateDebugResources FROM-CACHE
+Build cache key for task ':app:generateDebugResources' is d119a43fc764789f977bd247f485db19
+Task ':app:generateDebugResources' is not up-to-date because:
+  Output property 'validationReportFile' file /app/applet/app/build/intermediates/nested_resources_validation_report/debug/generateDebugResources/nestedResourcesValidationReport.txt has been removed.
+Loaded cache entry for task ':app:generateDebugResources' with cache key d119a43fc764789f977bd247f485db19
+Resolve mutations for :app:mergeDebugResources (Thread[#519,included builds,5,main]) started.
+:app:mergeDebugResources (Thread[#519,included builds,5,main]) started.
+
+> Task :app:mapDebugSourceSetPaths
+Caching disabled for task ':app:mapDebugSourceSetPaths' because:
+  Caching has been disabled for the task
+Task ':app:mapDebugSourceSetPaths' is not up-to-date because:
+  Output property 'filepathMappingFile' file /app/applet/app/build/intermediates/source_set_path_map/debug/mapDebugSourceSetPaths/file-map.txt has been removed.
+Resolve mutations for :app:packageDebugResources (Thread[#522,Execution worker Thread 3,5,main]) started.
+:app:packageDebugResources (Thread[#522,Execution worker Thread 3,5,main]) started.
+
+> Task :app:processDebugMainManifest FROM-CACHE
+Build cache key for task ':app:processDebugMainManifest' is 63951146843a4ffb74c98a3d2cfb5efc
+Task ':app:processDebugMainManifest' is not up-to-date because:
+  Value of input property 'manifestPlaceholders' has changed for task ':app:processDebugMainManifest'
+Loaded cache entry for task ':app:processDebugMainManifest' with cache key 63951146843a4ffb74c98a3d2cfb5efc
+Resolve mutations for :app:processDebugManifest (Thread[#520,Execution worker,5,main]) started.
+:app:processDebugManifest (Thread[#520,Execution worker,5,main]) started.
+
+> Task :app:processDebugManifest FROM-CACHE
+Build cache key for task ':app:processDebugManifest' is 0253a99d4b2f795992ca0568fcd0bc7c
+Task ':app:processDebugManifest' is not up-to-date because:
+  Output property 'multiApkManifestOutputDirectory' file /app/applet/app/build/intermediates/merged_manifests/debug/processDebugManifest has been removed.
+  Output property 'multiApkManifestOutputDirectory' file /app/applet/app/build/intermediates/merged_manifests/debug/processDebugManifest/AndroidManifest.xml has been removed.
+  Output property 'multiApkManifestOutputDirectory' file /app/applet/app/build/intermediates/merged_manifests/debug/processDebugManifest/output-metadata.json has been removed.
+Loaded cache entry for task ':app:processDebugManifest' with cache key 0253a99d4b2f795992ca0568fcd0bc7c
+Resolve mutations for :app:processDebugManifestForPackage (Thread[#520,Execution worker,5,main]) started.
+:app:processDebugManifestForPackage (Thread[#520,Execution worker,5,main]) started.
+
+> Task :app:checkDebugAarMetadata
+Caching disabled for task ':app:checkDebugAarMetadata' because:
+  Caching has been disabled for the task
+Task ':app:checkDebugAarMetadata' is not up-to-date because:
+  Output property 'dummyOutputDirectory' file /app/applet/app/build/intermediates/aar_metadata_check/debug/checkDebugAarMetadata has been removed.
+Resolve mutations for :app:compileDebugShaders (Thread[#521,Execution worker Thread 2,5,main]) started.
+:app:compileDebugShaders (Thread[#521,Execution worker Thread 2,5,main]) started.
+
+> Task :app:compileDebugShaders NO-SOURCE
+Skipping task ':app:compileDebugShaders' as it has no source files and no previous output files.
+Resolve mutations for :app:generateDebugAssets (Thread[#521,Execution worker Thread 2,5,main]) started.
+
+> Task :app:processDebugManifestForPackage FROM-CACHE
+Build cache key for task ':app:processDebugManifestForPackage' is 12e975e3bdb797eec87f722f19cf7a82
+Task ':app:processDebugManifestForPackage' is not up-to-date because:
+  Output property 'packageManifests' file /app/applet/app/build/intermediates/packaged_manifests/debug/processDebugManifestForPackage has been removed.
+  Output property 'packageManifests' file /app/applet/app/build/intermediates/packaged_manifests/debug/processDebugManifestForPackage/AndroidManifest.xml has been removed.
+  Output property 'packageManifests' file /app/applet/app/build/intermediates/packaged_manifests/debug/processDebugManifestForPackage/output-metadata.json has been removed.
+Loaded cache entry for task ':app:processDebugManifestForPackage' with cache key 12e975e3bdb797eec87f722f19cf7a82
+:app:generateDebugAssets (Thread[#521,Execution worker Thread 2,5,main]) started.
+:app:checkDebugDuplicateClasses (Thread[#520,Execution worker,5,main]) started.
+
+> Task :app:generateDebugAssets UP-TO-DATE
+Skipping task ':app:generateDebugAssets' as it has no actions.
+Resolve mutations for :app:mergeDebugAssets (Thread[#521,Execution worker Thread 2,5,main]) started.
+:app:mergeDebugAssets (Thread[#521,Execution worker Thread 2,5,main]) started.
+
+> Task :app:packageDebugResources FROM-CACHE
+Build cache key for task ':app:packageDebugResources' is 921be727297eec523d18eed294178667
+Task ':app:packageDebugResources' is not up-to-date because:
+  Output property 'dataBindingLayoutInfoOutFolder' file /app/applet/app/build/intermediates/data_binding_layout_info_type_package/debug/packageDebugResources/out has been removed.
+  Output property 'incrementalFolder' file /app/applet/app/build/intermediates/incremental/debug/packageDebugResources has been removed.
+  Output property 'incrementalFolder' file /app/applet/app/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties has been removed.
+  and more...
+Loaded cache entry for task ':app:packageDebugResources' with cache key 921be727297eec523d18eed294178667
+Resolve mutations for :app:parseDebugLocalResources (Thread[#522,Execution worker Thread 3,5,main]) started.
+:app:parseDebugLocalResources (Thread[#522,Execution worker Thread 3,5,main]) started.
+
+> Task :app:parseDebugLocalResources FROM-CACHE
+Build cache key for task ':app:parseDebugLocalResources' is 956bfdb247ff642c703c63cf5155722f
+Task ':app:parseDebugLocalResources' is not up-to-date because:
+  Output property 'librarySymbolsFile' file /app/applet/app/build/intermediates/local_only_symbol_list/debug/parseDebugLocalResources/R-def.txt has been removed.
+Loaded cache entry for task ':app:parseDebugLocalResources' with cache key 956bfdb247ff642c703c63cf5155722f
+:app:desugarDebugFileDependencies (Thread[#522,Execution worker Thread 3,5,main]) started.
+
+> Task :app:mergeDebugAssets
+Caching disabled for task ':app:mergeDebugAssets' because:
+  Simple merging task
+Task ':app:mergeDebugAssets' is not up-to-date because:
+  Output property 'outputDir' file /app/applet/app/build/intermediates/assets/debug/mergeDebugAssets has been removed.
+The input changes require a full rebuild for incremental task ':app:mergeDebugAssets'.
+Resolve mutations for :app:compressDebugAssets (Thread[#521,Execution worker Thread 2,5,main]) started.
+:app:compressDebugAssets (Thread[#521,Execution worker Thread 2,5,main]) started.
+
+> Task :app:compressDebugAssets FROM-CACHE
+Build cache key for task ':app:compressDebugAssets' is bfa8d24927860e311695172bf58cd704
+Task ':app:compressDebugAssets' is not up-to-date because:
+  Output property 'outputDir' file /app/applet/app/build/intermediates/compressed_assets/debug/compressDebugAssets/out has been removed.
+Loaded cache entry for task ':app:compressDebugAssets' with cache key bfa8d24927860e311695172bf58cd704
+:app:mergeDebugJniLibFolders (Thread[#521,Execution worker Thread 2,5,main]) started.
+
+> Task :app:desugarDebugFileDependencies FROM-CACHE
+Build cache key for task ':app:desugarDebugFileDependencies' is 8ccd721633db11f71af3620141fabc0c
+Task ':app:desugarDebugFileDependencies' is not up-to-date because:
+  Output property 'outputDirectory' file /app/applet/app/build/intermediates/external_file_lib_dex_archives/debug/desugarDebugFileDependencies has been removed.
+Loaded cache entry for task ':app:desugarDebugFileDependencies' with cache key 8ccd721633db11f71af3620141fabc0c
+:app:validateSigningDebug (Thread[#522,Execution worker Thread 3,5,main]) started.
+
+> Task :app:validateSigningDebug
+Caching disabled for task ':app:validateSigningDebug' because:
+  Caching has been disabled for the task
+Task ':app:validateSigningDebug' is not up-to-date because:
+  Output property 'dummyOutputDirectory' file /app/applet/app/build/intermediates/validate_signing_config/debug/validateSigningDebug has been removed.
+:app:writeDebugAppMetadata (Thread[#522,Execution worker Thread 3,5,main]) started.
+
+> Task :app:mergeDebugJniLibFolders
+Caching disabled for task ':app:mergeDebugJniLibFolders' because:
+  Simple merging task
+Task ':app:mergeDebugJniLibFolders' is not up-to-date because:
+  Output property 'outputDir' file /app/applet/app/build/intermediates/merged_jni_libs/debug/mergeDebugJniLibFolders/out has been removed.
+The input changes require a full rebuild for incremental task ':app:mergeDebugJniLibFolders'.
+Resolve mutations for :app:mergeDebugNativeLibs (Thread[#521,Execution worker Thread 2,5,main]) started.
+:app:mergeDebugNativeLibs (Thread[#521,Execution worker Thread 2,5,main]) started.
+
+> Task :app:writeDebugAppMetadata
+Caching disabled for task ':app:writeDebugAppMetadata' because:
+  Caching has been disabled for the task
+Task ':app:writeDebugAppMetadata' is not up-to-date because:
+  Output property 'outputFile' file /app/applet/app/build/intermediates/app_metadata/debug/writeDebugAppMetadata/app-metadata.properties has been removed.
+:app:writeDebugSigningConfigVersions (Thread[#522,Execution worker Thread 3,5,main]) started.
+
+> Task :app:writeDebugSigningConfigVersions
+Caching disabled for task ':app:writeDebugSigningConfigVersions' because:
+  Caching has been disabled for the task
+Task ':app:writeDebugSigningConfigVersions' is not up-to-date because:
+  Output property 'outputFile' file /app/applet/app/build/intermediates/signing_config_versions/debug/writeDebugSigningConfigVersions/signing-config-versions.json has been removed.
+
+> Task :app:mergeDebugNativeLibs
+Caching disabled for task ':app:mergeDebugNativeLibs' because:
+  Caching has been disabled for the task
+Task ':app:mergeDebugNativeLibs' is not up-to-date because:
+  Output property 'outputDir' file /app/applet/app/build/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out has been removed.
+  Output property 'outputDir' file /app/applet/app/build/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib has been removed.
+  Output property 'outputDir' file /app/applet/app/build/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/arm64-v8a has been removed.
+  and more...
+Resolve mutations for :app:stripDebugDebugSymbols (Thread[#521,Execution worker Thread 2,5,main]) started.
+:app:stripDebugDebugSymbols (Thread[#521,Execution worker Thread 2,5,main]) started.
+
+> Task :app:checkDebugDuplicateClasses
+Caching disabled for task ':app:checkDebugDuplicateClasses' because:
+  Caching has been disabled for the task
+Task ':app:checkDebugDuplicateClasses' is not up-to-date because:
+  Output property 'dummyOutputDirectory' file /app/applet/app/build/intermediates/duplicate_classes_check/debug/checkDebugDuplicateClasses has been removed.
+Resolve mutations for :app:mergeExtDexDebug (Thread[#520,Execution worker,5,main]) started.
+Resolve mutations for :app:mergeLibDexDebug (Thread[#522,Execution worker Thread 3,5,main]) started.
+:app:mergeExtDexDebug (Thread[#520,Execution worker,5,main]) started.
+:app:mergeLibDexDebug (Thread[#522,Execution worker Thread 3,5,main]) started.
+
+> Task :app:stripDebugDebugSymbols
+Caching disabled for task ':app:stripDebugDebugSymbols' because:
+  Caching has been disabled for the task
+Task ':app:stripDebugDebugSymbols' is not up-to-date because:
+  Output property 'outputDir' file /app/applet/app/build/intermediates/stripped_native_libs/debug/stripDebugDebugSymbols/out has been removed.
+  Output property 'outputDir' file /app/applet/app/build/intermediates/stripped_native_libs/debug/stripDebugDebugSymbols/out/lib has been removed.
+  Output property 'outputDir' file /app/applet/app/build/intermediates/stripped_native_libs/debug/stripDebugDebugSymbols/out/lib/arm64-v8a has been removed.
+  and more...
+The input changes require a full rebuild for incremental task ':app:stripDebugDebugSymbols'.
+C/C++: android.ndkVersion from module build.gradle is [27.0.12077973]
+C/C++: android.ndkVersion from module build.gradle is [27.0.12077973]
+C/C++: android.ndkPath from module build.gradle is not set
+C/C++: android.ndkVersion from module build.gradle is [27.0.12077973]
+C/C++: ndk.dir in local.properties is not set
+C/C++: android.ndkPath from module build.gradle is not set
+C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+C/C++: sdkFolder is /opt/android/sdk
+C/C++: android.ndkPath from module build.gradle is not set
+C/C++: NDK side-by-side folder from sdkFolder /opt/android/sdk/ndk does not exist
+C/C++: ndk.dir in local.properties is not set
+C/C++: ndk.dir in local.properties is not set
+C/C++: Folder /opt/android/sdk/ndk/27.0.12077973 does not exist. Ignoring.
+C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+C/C++: Folder /opt/android/sdk/ndk-bundle does not exist. Ignoring.
+C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+Unable to strip library '/app/applet/app/build/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/arm64-v8a/libandroidx.graphics.path.so' due to missing strip tool for ABI 'arm64-v8a'. Packaging it as is.
+C/C++: sdkFolder is /opt/android/sdk
+C/C++: sdkFolder is /opt/android/sdk
+C/C++: NDK side-by-side folder from sdkFolder /opt/android/sdk/ndk does not exist
+C/C++: NDK side-by-side folder from sdkFolder /opt/android/sdk/ndk does not exist
+C/C++: Folder /opt/android/sdk/ndk/27.0.12077973 does not exist. Ignoring.
+C/C++: Folder /opt/android/sdk/ndk/27.0.12077973 does not exist. Ignoring.
+C/C++: Folder /opt/android/sdk/ndk-bundle does not exist. Ignoring.
+C/C++: Folder /opt/android/sdk/ndk-bundle does not exist. Ignoring.
+Unable to strip library '/app/applet/app/build/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/armeabi-v7a/libandroidx.graphics.path.so' due to missing strip tool for ABI 'armeabi-v7a'. Packaging it as is.
+Unable to strip library '/app/applet/app/build/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/arm64-v8a/libdatastore_shared_counter.so' due to missing strip tool for ABI 'arm64-v8a'. Packaging it as is.
+C/C++: android.ndkVersion from module build.gradle is [27.0.12077973]
+C/C++: android.ndkPath from module build.gradle is not set
+C/C++: ndk.dir in local.properties is not set
+C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+C/C++: sdkFolder is /opt/android/sdk
+C/C++: NDK side-by-side folder from sdkFolder /opt/android/sdk/ndk does not exist
+C/C++: Folder /opt/android/sdk/ndk/27.0.12077973 does not exist. Ignoring.
+C/C++: android.ndkVersion from module build.gradle is [27.0.12077973]
+C/C++: android.ndkPath from module build.gradle is not set
+C/C++: android.ndkVersion from module build.gradle is [27.0.12077973]
+C/C++: android.ndkPath from module build.gradle is not set
+C/C++: ndk.dir in local.properties is not set
+C/C++: Folder /opt/android/sdk/ndk-bundle does not exist. Ignoring.
+Unable to strip library '/app/applet/app/build/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/x86/libandroidx.graphics.path.so' due to missing strip tool for ABI 'x86'. Packaging it as is.
+C/C++: ndk.dir in local.properties is not set
+C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+C/C++: sdkFolder is /opt/android/sdk
+C/C++: sdkFolder is /opt/android/sdk
+C/C++: NDK side-by-side folder from sdkFolder /opt/android/sdk/ndk does not exist
+C/C++: Folder /opt/android/sdk/ndk/27.0.12077973 does not exist. Ignoring.
+C/C++: NDK side-by-side folder from sdkFolder /opt/android/sdk/ndk does not exist
+C/C++: Folder /opt/android/sdk/ndk-bundle does not exist. Ignoring.
+C/C++: Folder /opt/android/sdk/ndk/27.0.12077973 does not exist. Ignoring.
+Unable to strip library '/app/applet/app/build/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/x86_64/libandroidx.graphics.path.so' due to missing strip tool for ABI 'x86_64'. Packaging it as is.
+C/C++: Folder /opt/android/sdk/ndk-bundle does not exist. Ignoring.
+Unable to strip library '/app/applet/app/build/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/x86/libdatastore_shared_counter.so' due to missing strip tool for ABI 'x86'. Packaging it as is.
+C/C++: android.ndkVersion from module build.gradle is [27.0.12077973]
+C/C++: android.ndkPath from module build.gradle is not set
+C/C++: ndk.dir in local.properties is not set
+C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+C/C++: sdkFolder is /opt/android/sdk
+C/C++: NDK side-by-side folder from sdkFolder /opt/android/sdk/ndk does not exist
+C/C++: Folder /opt/android/sdk/ndk/27.0.12077973 does not exist. Ignoring.
+C/C++: Folder /opt/android/sdk/ndk-bundle does not exist. Ignoring.
+Unable to strip library '/app/applet/app/build/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/x86_64/libdatastore_shared_counter.so' due to missing strip tool for ABI 'x86_64'. Packaging it as is.
+C/C++: android.ndkVersion from module build.gradle is [27.0.12077973]
+C/C++: android.ndkPath from module build.gradle is not set
+C/C++: ndk.dir in local.properties is not set
+C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+C/C++: sdkFolder is /opt/android/sdk
+C/C++: NDK side-by-side folder from sdkFolder /opt/android/sdk/ndk does not exist
+C/C++: Folder /opt/android/sdk/ndk/27.0.12077973 does not exist. Ignoring.
+C/C++: Folder /opt/android/sdk/ndk-bundle does not exist. Ignoring.
+Unable to strip library '/app/applet/app/build/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/armeabi-v7a/libdatastore_shared_counter.so' due to missing strip tool for ABI 'armeabi-v7a'. Packaging it as is.
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libdatastore_shared_counter.so.
+
+> Task :app:mergeLibDexDebug FROM-CACHE
+Build cache key for task ':app:mergeLibDexDebug' is 4274a1a7efc9fec8ce784962debe595b
+Task ':app:mergeLibDexDebug' is not up-to-date because:
+  Output property 'outputDir' file /app/applet/app/build/intermediates/dex/debug/mergeLibDexDebug has been removed.
+  Output property 'outputDir' file /app/applet/app/build/intermediates/dex/debug/mergeLibDexDebug/0 has been removed.
+  Output property 'outputDir' file /app/applet/app/build/intermediates/dex/debug/mergeLibDexDebug/1 has been removed.
+  and more...
+Loaded cache entry for task ':app:mergeLibDexDebug' with cache key 4274a1a7efc9fec8ce784962debe595b
+
+> Task :app:mergeDebugResources FROM-CACHE
+Build cache key for task ':app:mergeDebugResources' is 0cd0ff8dc5dc52ca56411e0c9e6826cb
+Task ':app:mergeDebugResources' is not up-to-date because:
+  Output property 'blameLogOutputFolder' file /app/applet/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out has been removed.
+  Output property 'blameLogOutputFolder' file /app/applet/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2 has been removed.
+  Output property 'blameLogOutputFolder' file /app/applet/app/build/intermediates/merged_res_blame_folder/debug/mergeDebugResources/out/multi-v2/mergeDebugResources.json has been removed.
+  and more...
+Loaded cache entry for task ':app:mergeDebugResources' with cache key 0cd0ff8dc5dc52ca56411e0c9e6826cb
+Resolve mutations for :app:processDebugResources (Thread[#519,included builds,5,main]) started.
+:app:processDebugResources (Thread[#519,included builds,5,main]) started.
+
+> Task :app:processDebugResources FROM-CACHE
+Build cache key for task ':app:processDebugResources' is 8135586851517a022bf964b4995a1bce
+Task ':app:processDebugResources' is not up-to-date because:
+  Output property 'RClassOutputJar' file /app/applet/app/build/intermediates/compile_and_runtime_not_namespaced_r_class_jar/debug/processDebugResources/R.jar has been removed.
+  Output property 'linkedResourcesOutputDir' file /app/applet/app/build/intermediates/linked_resources_binary_format/debug/processDebugResources has been removed.
+  Output property 'linkedResourcesOutputDir' file /app/applet/app/build/intermediates/linked_resources_binary_format/debug/processDebugResources/linked-resources-binary-format-debug.ap_ has been removed.
+  and more...
+Loaded cache entry for task ':app:processDebugResources' with cache key 8135586851517a022bf964b4995a1bce
+Resolve mutations for :app:kspDebugKotlin (Thread[#519,included builds,5,main]) started.
+:app:kspDebugKotlin (Thread[#519,included builds,5,main]) started.
+
+> Task :app:kspDebugKotlin FROM-CACHE
+file or directory '/app/applet/app/src/debug/kotlin', not found
+file or directory '/app/applet/app/src/debug/java', not found
+file or directory '/app/applet/app/src/main/java', not found
+file or directory '/app/applet/app/src/main/java', not found
+file or directory '/app/applet/app/src/debug/java', not found
+file or directory '/app/applet/app/src/debug/kotlin', not found
+file or directory '/app/applet/app/src/debug/java', not found
+file or directory '/app/applet/app/src/main/java', not found
+file or directory '/app/applet/app/src/main/java', not found
+file or directory '/app/applet/app/src/debug/java', not found
+Build cache key for task ':app:kspDebugKotlin' is 10049e9eef71b19f281071bda4f96133
+Task ':app:kspDebugKotlin' is not up-to-date because:
+  Output property '$1$1' file /app/applet/app/build/generated/ksp/debug/kotlin has been removed.
+  Output property '$1$2' file /app/applet/app/build/generated/ksp/debug/java has been removed.
+  Output property '$1$2' file /app/applet/app/build/generated/ksp/debug/java/com has been removed.
+  and more...
+Loaded cache entry for task ':app:kspDebugKotlin' with cache key 10049e9eef71b19f281071bda4f96133
+Resolve mutations for :app:compileDebugKotlin (Thread[#519,included builds,5,main]) started.
+:app:compileDebugKotlin (Thread[#519,included builds,5,main]) started.
+
+> Task :app:compileDebugKotlin FROM-CACHE
+Build cache key for task ':app:compileDebugKotlin' is f66eb659a97504b1849cac1b5c0edabc
+Task ':app:compileDebugKotlin' is not up-to-date because:
+  Output property 'classpathSnapshotProperties.classpathSnapshotDir' file /app/applet/app/build/kotlin/compileDebugKotlin/classpath-snapshot has been removed.
+  Output property 'destinationDirectory' file /app/applet/app/build/tmp/kotlin-classes/debug has been removed.
+  Output property 'destinationDirectory' file /app/applet/app/build/tmp/kotlin-classes/debug/com has been removed.
+  and more...
+Loaded cache entry for task ':app:compileDebugKotlin' with cache key f66eb659a97504b1849cac1b5c0edabc
+Resolve mutations for :app:compileDebugJavaWithJavac (Thread[#519,included builds,5,main]) started.
+:app:compileDebugJavaWithJavac (Thread[#519,included builds,5,main]) started.
+
+> Task :app:compileDebugJavaWithJavac FROM-CACHE
+file or directory '/app/applet/app/build/generated/ksp/debug/classes', not found
+file or directory '/app/applet/app/build/generated/ksp/debug/classes', not found
+Build cache key for task ':app:compileDebugJavaWithJavac' is 63b9e0babe4c592a2685905af7854c2b
+Task ':app:compileDebugJavaWithJavac' is not up-to-date because:
+  Output property 'destinationDirectory' file /app/applet/app/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes has been removed.
+  Output property 'destinationDirectory' file /app/applet/app/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com has been removed.
+  Output property 'destinationDirectory' file /app/applet/app/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/example has been removed.
+  and more...
+Loaded cache entry for task ':app:compileDebugJavaWithJavac' with cache key 63b9e0babe4c592a2685905af7854c2b
+No compile result for :app:compileDebugJavaWithJavac
+Resolve mutations for :app:hiltAggregateDepsDebug (Thread[#519,included builds,5,main]) started.
+:app:hiltAggregateDepsDebug (Thread[#519,included builds,5,main]) started.
+
+> Task :app:hiltAggregateDepsDebug FROM-CACHE
+file or directory '/app/applet/app/build/generated/ksp/debug/classes', not found
+Build cache key for task ':app:hiltAggregateDepsDebug' is 598654087f1991ef85b52eb315a0564b
+Task ':app:hiltAggregateDepsDebug' is not up-to-date because:
+  Output property 'outputDir' file /app/applet/app/build/generated/hilt/component_trees/debug has been removed.
+Loaded cache entry for task ':app:hiltAggregateDepsDebug' with cache key 598654087f1991ef85b52eb315a0564b
+Resolve mutations for :app:hiltJavaCompileDebug (Thread[#519,included builds,5,main]) started.
+:app:hiltJavaCompileDebug (Thread[#519,included builds,5,main]) started.
+
+> Task :app:hiltJavaCompileDebug NO-SOURCE
+Skipping task ':app:hiltJavaCompileDebug' as it has no source files and no previous output files.
+Resolve mutations for :app:processDebugJavaRes (Thread[#519,included builds,5,main]) started.
+Resolve mutations for :app:transformDebugClassesWithAsm (Thread[#522,Execution worker Thread 3,5,main]) started.
+:app:processDebugJavaRes (Thread[#519,included builds,5,main]) started.
+:app:transformDebugClassesWithAsm (Thread[#522,Execution worker Thread 3,5,main]) started.
+
+> Task :app:processDebugJavaRes
+file or directory '/app/applet/app/src/main/resources', not found
+file or directory '/app/applet/app/src/debug/resources', not found
+file or directory '/app/applet/app/build/generated/ksp/debug/classes', not found
+file or directory '/app/applet/app/build/generated/ksp/debug/classes', not found
+Caching disabled for task ':app:processDebugJavaRes' because:
+  Caching has been disabled for the task
+Task ':app:processDebugJavaRes' is not up-to-date because:
+  Output property 'outDirectory' file /app/applet/app/build/intermediates/java_res/debug/processDebugJavaRes/out has been removed.
+  Output property 'outDirectory' file /app/applet/app/build/intermediates/java_res/debug/processDebugJavaRes/out/com has been removed.
+  Output property 'outDirectory' file /app/applet/app/build/intermediates/java_res/debug/processDebugJavaRes/out/com/example has been removed.
+  and more...
+file or directory '/app/applet/app/src/main/resources', not found
+file or directory '/app/applet/app/src/debug/resources', not found
+file or directory '/app/applet/app/build/generated/ksp/debug/classes', not found
+file or directory '/app/applet/app/build/generated/ksp/debug/classes', not found
+file or directory '/app/applet/app/src/main/resources', not found
+file or directory '/app/applet/app/src/debug/resources', not found
+file or directory '/app/applet/app/build/intermediates/hilt/component_classes/debug', not found
+Resolve mutations for :app:mergeDebugJavaResource (Thread[#519,included builds,5,main]) started.
+:app:mergeDebugJavaResource (Thread[#519,included builds,5,main]) started.
+
+> Task :app:transformDebugClassesWithAsm FROM-CACHE
+file or directory '/app/applet/app/build/generated/ksp/debug/classes', not found
+file or directory '/app/applet/app/build/generated/ksp/debug/classes', not found
+Build cache key for task ':app:transformDebugClassesWithAsm' is fd5e0cbadb36b6a5e2f6afd4c1fc9562
+Task ':app:transformDebugClassesWithAsm' is not up-to-date because:
+  Output property 'classesOutputDir' file /app/applet/app/build/intermediates/classes/debug/transformDebugClassesWithAsm/dirs has been removed.
+  Output property 'classesOutputDir' file /app/applet/app/build/intermediates/classes/debug/transformDebugClassesWithAsm/dirs/com has been removed.
+  Output property 'classesOutputDir' file /app/applet/app/build/intermediates/classes/debug/transformDebugClassesWithAsm/dirs/com/example has been removed.
+  and more...
+Loaded cache entry for task ':app:transformDebugClassesWithAsm' with cache key fd5e0cbadb36b6a5e2f6afd4c1fc9562
+Resolve mutations for :app:dexBuilderDebug (Thread[#522,Execution worker Thread 3,5,main]) started.
+:app:dexBuilderDebug (Thread[#522,Execution worker Thread 3,5,main]) started.
+
+> Task :app:dexBuilderDebug FROM-CACHE
+Build cache key for task ':app:dexBuilderDebug' is b529d09ad1d5446a2bf9e11539f4ede6
+Task ':app:dexBuilderDebug' is not up-to-date because:
+  Output property 'externalLibsFromArtifactTransformsOutputs.dex' file /app/applet/app/build/intermediates/external_libs_dex_archive_with_artifact_transforms/debug/dexBuilderDebug/out has been removed.
+  Output property 'externalLibsOutputs.dex' file /app/applet/app/build/intermediates/external_libs_dex_archive/debug/dexBuilderDebug/out has been removed.
+  Output property 'mixedScopeOutputs.dex' file /app/applet/app/build/intermediates/mixed_scope_dex_archive/debug/dexBuilderDebug/out has been removed.
+  and more...
+Loaded cache entry for task ':app:dexBuilderDebug' with cache key b529d09ad1d5446a2bf9e11539f4ede6
+Resolve mutations for :app:mergeProjectDexDebug (Thread[#522,Execution worker Thread 3,5,main]) started.
+:app:mergeProjectDexDebug (Thread[#522,Execution worker Thread 3,5,main]) started.
+
+> Task :app:mergeProjectDexDebug FROM-CACHE
+Build cache key for task ':app:mergeProjectDexDebug' is 90febcbb3e9e1db8a93f021a17b9a1b2
+Task ':app:mergeProjectDexDebug' is not up-to-date because:
+  Output property 'outputDir' file /app/applet/app/build/intermediates/dex/debug/mergeProjectDexDebug has been removed.
+  Output property 'outputDir' file /app/applet/app/build/intermediates/dex/debug/mergeProjectDexDebug/0 has been removed.
+  Output property 'outputDir' file /app/applet/app/build/intermediates/dex/debug/mergeProjectDexDebug/0/classes.dex has been removed.
+  and more...
+Loaded cache entry for task ':app:mergeProjectDexDebug' with cache key 90febcbb3e9e1db8a93f021a17b9a1b2
+
+> Task :app:mergeExtDexDebug FROM-CACHE
+Build cache key for task ':app:mergeExtDexDebug' is 69418606844626a2516ee4f7c2f47a1e
+Task ':app:mergeExtDexDebug' is not up-to-date because:
+  Output property 'outputDir' file /app/applet/app/build/intermediates/dex/debug/mergeExtDexDebug has been removed.
+  Output property 'outputDir' file /app/applet/app/build/intermediates/dex/debug/mergeExtDexDebug/classes.dex has been removed.
+  Output property 'outputDir' file /app/applet/app/build/intermediates/dex/debug/mergeExtDexDebug/classes2.dex has been removed.
+  and more...
+Loaded cache entry for task ':app:mergeExtDexDebug' with cache key 69418606844626a2516ee4f7c2f47a1e
+
+> Task :app:mergeDebugJavaResource
+Caching disabled for task ':app:mergeDebugJavaResource' because:
+  Caching has been disabled for the task
+Task ':app:mergeDebugJavaResource' is not up-to-date because:
+  Output property 'cacheDir' file /app/applet/app/build/intermediates/incremental/debug-mergeJavaRes/zip-cache has been removed.
+  Output property 'cacheDir' file /app/applet/app/build/intermediates/incremental/debug-mergeJavaRes/zip-cache/0Cmuc3N4iZC6nOleRvlXwR_nckU= has been removed.
+  Output property 'cacheDir' file /app/applet/app/build/intermediates/incremental/debug-mergeJavaRes/zip-cache/0mTyVLHLmKf+_op3N8unVhDNgEk= has been removed.
+  and more...
+The input changes require a full rebuild for incremental task ':app:mergeDebugJavaResource'.
+Resolve mutations for :app:packageDebug (Thread[#519,included builds,5,main]) started.
+:app:packageDebug (Thread[#519,included builds,5,main]) started.
+
+> Task :app:packageDebug
+Caching disabled for task ':app:packageDebug' because:
+  Caching has been disabled for the task
+Task ':app:packageDebug' is not up-to-date because:
+  Output property 'ideModelOutputFile' file /app/applet/app/build/outputs/apk/debug/output-metadata.json has been removed.
+  Output property 'incrementalFolder' file /app/applet/app/build/intermediates/incremental/packageDebug/tmp has been removed.
+  Output property 'incrementalFolder' file /app/applet/app/build/intermediates/incremental/packageDebug/tmp/debug has been removed.
+  and more...
+The input changes require a full rebuild for incremental task ':app:packageDebug'.
+Resolve mutations for :app:createDebugApkListingFileRedirect (Thread[#519,included builds,5,main]) started.
+Resolve mutations for :app:assembleDebug (Thread[#520,Execution worker,5,main]) started.
+:app:createDebugApkListingFileRedirect (Thread[#519,included builds,5,main]) started.
+:app:assembleDebug (Thread[#520,Execution worker,5,main]) started.
+
+> Task :app:assembleDebug
+Skipping task ':app:assembleDebug' as it has no actions.
+
+> Task :app:createDebugApkListingFileRedirect
+Caching disabled for task ':app:createDebugApkListingFileRedirect' because:
+  Caching has been disabled for the task
+Task ':app:createDebugApkListingFileRedirect' is not up-to-date because:
+  Output property 'redirectFile' file /app/applet/app/build/intermediates/apk_ide_redirect_file/debug/createDebugApkListingFileRedirect/redirect.txt has been removed.
+
+BUILD SUCCESSFUL in 3s
+40 actionable tasks: 17 executed, 23 from cache
+Configuration cache entry reused.
