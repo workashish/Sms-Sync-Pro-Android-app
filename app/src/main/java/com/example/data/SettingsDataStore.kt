@@ -34,10 +34,10 @@ class SettingsDataStore @Inject constructor(
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    private val _webhookSecretFlow = MutableStateFlow(securePrefs.getString("webhook_secret", "") ?: "")
+    private val _webhookSecretFlow = MutableStateFlow(securePrefs.getString("webhook_secret", null) ?: "YOUR_HMAC_SECRET_KEY")
     val webhookSecretFlow = _webhookSecretFlow.asStateFlow()
 
-    private val _aesEncryptionKeyFlow = MutableStateFlow(securePrefs.getString("aes_encryption_key", "") ?: "")
+    private val _aesEncryptionKeyFlow = MutableStateFlow(securePrefs.getString("aes_encryption_key", null) ?: "YOUR_AES_PASSWORD")
     val aesEncryptionKeyFlow = _aesEncryptionKeyFlow.asStateFlow()
 
     companion object {
@@ -108,6 +108,6 @@ class SettingsDataStore @Inject constructor(
         _aesEncryptionKeyFlow.value = value
     }
 
-    fun getWebhookSecret(): String = securePrefs.getString("webhook_secret", "") ?: ""
-    fun getAesEncryptionKey(): String = securePrefs.getString("aes_encryption_key", "") ?: ""
+    fun getWebhookSecret(): String = securePrefs.getString("webhook_secret", null) ?: "YOUR_HMAC_SECRET_KEY"
+    fun getAesEncryptionKey(): String = securePrefs.getString("aes_encryption_key", null) ?: "YOUR_AES_PASSWORD"
 }

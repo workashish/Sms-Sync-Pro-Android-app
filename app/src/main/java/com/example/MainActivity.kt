@@ -70,6 +70,9 @@ class MainActivity : ComponentActivity() {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                 perms.add(Manifest.permission.POST_NOTIFICATIONS)
                             }
+                            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+                                perms.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                            }
                             requestPermissionLauncher.launch(perms.toTypedArray())
                         }
                     ) {

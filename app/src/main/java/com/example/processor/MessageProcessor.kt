@@ -59,11 +59,10 @@ class MessageProcessor @Inject constructor(
         val activeRules = smsDao.getActiveRules()
         
         // We run the rules processing in parallel
-        val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        
-        activeRules.forEach { rule ->
-            coroutineScope.launch {
-                val keyword = rule.keywordFilter.trim()
+        kotlinx.coroutines.coroutineScope {
+            activeRules.forEach { rule ->
+                launch {
+                    val keyword = rule.keywordFilter.trim()
                 if (keyword.isNotEmpty()) {
                     val isMatch = if (keyword.startsWith("/") && (keyword.endsWith("/") || keyword.endsWith("/i"))) {
                         try {
