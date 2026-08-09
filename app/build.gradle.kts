@@ -9,12 +9,12 @@ plugins {
 
 android {
   namespace = "com.example"
-  compileSdk = 35
+  compileSdk = 34
 
   defaultConfig {
     applicationId = "com.aistudio.smsforwarder.rndmxy"
     minSdk = 24
-    targetSdk = 35
+    targetSdk = 34
     versionCode = 1
     versionName = "1.0"
 
@@ -34,6 +34,8 @@ android {
       storePassword = "android"
       keyAlias = "androiddebugkey"
       keyPassword = "android"
+      enableV1Signing = true
+      enableV2Signing = true
     }
   }
 
