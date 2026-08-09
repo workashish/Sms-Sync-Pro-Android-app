@@ -13,11 +13,11 @@ android {
   compileSdk = 34
 
   defaultConfig {
-    applicationId = "com.aistudio.smsforwarder.rndmxy"
-    minSdk = 23
+    applicationId = "com.aistudio.smsforwarder.rndmxy.v2"
+    minSdk = 24
     targetSdk = 34
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = 2
+    versionName = "2.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
