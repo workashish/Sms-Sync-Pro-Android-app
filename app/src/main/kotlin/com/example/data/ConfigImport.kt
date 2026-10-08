@@ -10,8 +10,9 @@ object ConfigImport {
         require(root.optInt("schema_version", 1) == 1) { "Unsupported configuration version." }
         require(root.has("settings") || root.has("rules")) { "No settings or rules found." }
         val settings = if (root.has("settings")) root.getJSONObject("settings") else JSONObject()
+        FixedSettings.keys.forEach { settings.remove(it) }
         val booleans = setOf("globalEnable", "includeDeviceModel", "retryFailedWebhooks", "preventScreenCapture", "enableSmsCommands", "captureRcs")
-        val strings = setOf("webhookSecret", "aesEncryptionKey", "customWebhookTemplate", "updateUrl", "authorizedCommandSenders")
+        val strings = setOf("customWebhookTemplate", "authorizedCommandSenders")
         settings.keys().forEach { key ->
             val value = settings.get(key)
             when (key) {
@@ -25,7 +26,6 @@ object ConfigImport {
                 else -> throw IllegalArgumentException("Unknown setting: $key")
             }
         }
-        if (settings.optString("updateUrl").isNotBlank()) com.example.updater.UpdateMetadata.secureUrl(settings.getString("updateUrl"))
         if (settings.optString("customWebhookTemplate").isNotBlank()) JSONObject(settings.getString("customWebhookTemplate"))
         val rules = if (!root.has("rules")) emptyList() else {
             val array = root.getJSONArray("rules")

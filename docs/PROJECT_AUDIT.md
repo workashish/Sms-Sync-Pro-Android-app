@@ -13,7 +13,7 @@ The repositories were reviewed together, starting at Android `c7e2638` and dashb
 | RCS capture | Notification summaries, ongoing/self-sent entries skipped; stable event identities, persistent fallback cache and cross-source deduplication implemented. | Real messaging-account/provider behavior needs a physical-phone test. Providers without timestamps cannot guarantee distinction between identical repeated content and updates. Android content redaction is respected. |
 | Background/status | Indefinite dataSync foreground service removed. WorkManager recovery replaces service-based claims. UI shows enabled/paused/no-rule states and real queue count; permission/SIM status is visible. | Emulator startup/recovery passes. Force-stop and OEM/platform restrictions cannot be bypassed or represented as guarantees. |
 | SMS delivery | Explicit multipart sent/delivery PendingIntents and protected receiver; SENDING/SENT/DELIVERED states; no ready/default SIM errors; selected-SIM UI; uncertain carrier results are not resent automatically. | Code and API compatibility checks pass. Actual carrier/dual-SIM outcomes require a physical phone. SENT is not presented as proof of delivery. |
-| Import integrity | Complete prevalidation, atomic Room settings/rules commit, idempotent merge. Secrets can be imported explicitly; exports exclude secrets/internal keys/message history. | Unit and device tests verify invalid imports do not partially apply and repeat imports do not duplicate rules. |
+| Import integrity | Complete prevalidation, atomic Room settings/rules commit, idempotent merge. HMAC/AES/update URL are fixed by the APK and imported overrides are ignored; exports exclude these settings/internal keys/message history. | Unit and device tests verify invalid imports do not partially apply and repeat imports do not duplicate rules. |
 | Pause behavior | Pause retains queued work and skips new forwarding; resume schedules pending items. Explicit cancel marks unsent receipts/outbox cancelled. HTTP retries preserve IDs; uncertain SMS is not auto-resubmitted. | Device pause/resume test verifies no consumed network attempt while paused and successful same-ID delivery after resume. In-flight work may finish. |
 | Login/session | Random signed seven-day sessions, database expiry/revocation checks, password/secret rotation invalidation, distributed PostgreSQL login counters, origin/body limits. | Real SQL-backed HTTP tests verify auth, logout revocation, expired/tampered token rejection, CSRF and rate limiting. Real-browser testing also caught/fixed reverse-proxy Host/origin handling. |
 | Payload protocol | Explicit schema_version/encryption/id/timestamp contract. Legacy messages without adequate identity get independent IDs rather than collapsing distinct arrivals. | Version/decryption/HMAC/invalid-batch tests pass. Legacy senders without stable identity cannot offer exact retry idempotency. |
@@ -30,7 +30,7 @@ The repositories were reviewed together, starting at Android `c7e2638` and dashb
 
 `app/src/main/assets/default_config.json` remains exactly as requested, with the active `sms sync dashboard` rule and supplied HMAC/AES strings. The final APK is checked for that packaged asset. Stored edits survive compatible upgrades; defaults do not overwrite existing user configuration.
 
-Those literal strings are public placeholders because the owner explicitly required them. They are not unique secret credentials. A private production deployment must use unique matching overrides in app Settings and server environment variables. This is an accepted owner-default constraint, not a claim of secret per-device provisioning.
+Those literal strings are public placeholders because the owner explicitly required them. They are not unique secret credentials. A private production deployment must use unique matching values in the packaged APK defaults and server environment variables. This is an accepted owner-default constraint, not a claim of secret per-device provisioning.
 
 ## Signing and release artifacts
 
@@ -63,3 +63,7 @@ The implemented repository gaps have concrete remedies and local evidence. “Pe
 - https://supabase.com/docs/guides/database/postgres/row-level-security
 - https://vercel.com/docs/headers/request-headers
 - https://docs.github.com/en/rest/releases/releases
+
+## 2.2.1 fixed settings
+
+HMAC, AES and the official GitHub update URL are fixed by the APK. UI editors and setter APIs are removed. Older stored overrides reset to packaged values; imports cannot change them. Other settings remain editable.

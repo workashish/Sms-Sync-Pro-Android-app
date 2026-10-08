@@ -43,3 +43,7 @@ Real browser checks verify login under the actual Host/origin, long-message expa
 The emulator is left on the final signed 2.2 release with clean default configuration and no temporary forwarding rule. Temporary update/network test permissions were restored; local fixtures and test database processes were stopped. Build/test logs, checksums, public signing certificate fingerprint, screenshots and audit closure documents are retained.
 
 Production database migration and deployment remain blocked by absent Supabase/Vercel credentials. The original signing key is absent. A physical phone, real carrier/dual-SIM and real messaging/RCS account are unavailable. OS notification permission/provider redaction cannot be guaranteed. Those external conditions are explicitly not reported as tested or perfect.
+
+## 2.2.1 fixed-setting regression
+
+Assembly, lint and 18 unit tests pass. Three targeted emulator instrumentation tests pass: immutable settings/legacy override reset, atomic imports and Keystore encryption. UI inspection confirms HMAC/AES use non-editable status text and Updates contains the official-release description and Check for Updates button, with no URL editor. Signed release 2.2.1 (versionCode 5) installs in place with the same certificate; packaged defaults and ZIP/signature integrity are verified.

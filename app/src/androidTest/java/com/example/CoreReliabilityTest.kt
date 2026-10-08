@@ -105,4 +105,24 @@ class CoreReliabilityTest {
             assertTrue(dao.receipt(receipt.id)!!.processed)
         } finally {rules.forEach{dao.setRuleActive(it.id,it.isActive)};settings.applyImport(original,emptyList())}
     }
+    @Test fun fixedSettingsSurviveImportsAndResetLegacyOverrides() = runBlocking {
+        val dao = services.dao(); val settings = services.settings(); val vault = services.vault()
+        val original = settings.snapshot()
+        try {
+            val override = JSONObject().put("updateUrl", "https://untrusted.example").put("webhookSecret", "changed").put("aesEncryptionKey", "changed")
+            settings.applyImport(override, emptyList())
+            val imported = settings.snapshot()
+            FixedSettings.keys.forEach { assertEquals(original.getString(it), imported.getString(it)) }
+            val legacy = JSONObject(original.toString())
+            override.keys().forEach { legacy.put(it, override.get(it)) }
+            dao.saveConfig(AppConfig(payload = vault.encrypt(legacy.toString())))
+            val migrated = settings.snapshot()
+            val persisted = JSONObject(vault.decrypt(dao.getConfig()!!.payload))
+            FixedSettings.keys.forEach {
+                assertEquals(original.getString(it), migrated.getString(it))
+                assertEquals(original.getString(it), persisted.getString(it))
+            }
+            assertEquals(FixedSettings.UPDATE_URL, settings.updateUrl.first())
+        } finally { settings.applyImport(original, emptyList()) }
+    }
 }

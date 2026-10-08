@@ -127,9 +127,6 @@ class MainViewModel @Inject constructor(
     fun updateCustomWebhookTemplate(value: String) = viewModelScope.launch { settings.updateCustomWebhookTemplate(value) }
     fun updateEnableSmsCommands(value: Boolean) = viewModelScope.launch { settings.updateEnableSmsCommands(value) }
     fun updateCaptureRcs(value: Boolean) = viewModelScope.launch { settings.updateCaptureRcs(value) }
-    fun updateUpdateUrl(value: String) = viewModelScope.launch { settings.updateUpdateUrl(value) }
-    fun updateWebhookSecret(value: String) = viewModelScope.launch { settings.updateWebhookSecret(value) }
-    fun updateAesEncryptionKey(value: String) = viewModelScope.launch { settings.updateAesEncryptionKey(value) }
     
     fun exportConfig(uri: Uri) {
         viewModelScope.launch {

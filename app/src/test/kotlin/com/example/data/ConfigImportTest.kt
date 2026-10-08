@@ -15,4 +15,18 @@ class ConfigImportTest {
             try { ConfigImport.parse(invalid, false); fail("Invalid import accepted") } catch (_: IllegalArgumentException) {}
         }
     }
+    @Test fun legacyBackupCannotOverrideApkSettings() {
+        val parsed = ConfigImport.parse("""{"settings":{"updateUrl":"http://untrusted.example","webhookSecret":"changed","aesEncryptionKey":"changed","webhookTimeout":15}}""", false)
+        FixedSettings.keys.forEach { assertFalse(parsed.settings.has(it)) }
+        assertEquals(15, parsed.settings.getInt("webhookTimeout"))
+    }
+    @Test fun fixedPolicyReplacesStoredOverridesWithoutChangingOtherSettings() {
+        val defaults = JSONObject().put("webhookSecret", "YOUR_HMAC_SECRET_KEY").put("aesEncryptionKey", "YOUR_AES_PASSWORD")
+        val saved = JSONObject().put("updateUrl", "https://untrusted.example").put("webhookSecret", "changed").put("aesEncryptionKey", "changed").put("webhookTimeout", 15)
+        FixedSettings.applyTo(saved, defaults)
+        assertEquals(FixedSettings.UPDATE_URL, saved.getString("updateUrl"))
+        assertEquals("YOUR_HMAC_SECRET_KEY", saved.getString("webhookSecret"))
+        assertEquals("YOUR_AES_PASSWORD", saved.getString("aesEncryptionKey"))
+        assertEquals(15, saved.getInt("webhookTimeout"))
+    }
 }

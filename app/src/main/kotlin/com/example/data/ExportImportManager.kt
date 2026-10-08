@@ -14,7 +14,7 @@ class ExportImportManager @Inject constructor(@ApplicationContext private val co
     private val settings: SettingsDataStore, private val dao: SmsDao) {
     suspend fun exportConfig(uri: Uri): Boolean = withContext(Dispatchers.IO) {
         try {
-            val configuration = settings.snapshot().apply { remove("webhookSecret"); remove("aesEncryptionKey"); remove("_fingerprintKey") }
+            val configuration = settings.snapshot().apply { FixedSettings.keys.forEach { remove(it) }; remove("_fingerprintKey") }
             val rules = JSONArray()
             dao.getAllRulesNonFlow().forEach { rule -> rules.put(JSONObject().put("name", rule.name).put("type", rule.type)
                 .put("target", rule.target).put("keywordFilter", rule.keywordFilter).put("isActive", rule.isActive)) }

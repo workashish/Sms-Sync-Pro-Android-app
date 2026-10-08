@@ -15,8 +15,8 @@ android {
     applicationId = "com.aistudio.smsforwarder.rndmxy.v2"
     minSdk = 21
     targetSdk = 35
-    versionCode = System.getenv("SMS_SYNC_VERSION_CODE")?.toIntOrNull() ?: 4
-    versionName = System.getenv("SMS_SYNC_VERSION_NAME") ?: "2.2"
+    versionCode = System.getenv("SMS_SYNC_VERSION_CODE")?.toIntOrNull() ?: 5
+    versionName = System.getenv("SMS_SYNC_VERSION_NAME") ?: "2.2.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

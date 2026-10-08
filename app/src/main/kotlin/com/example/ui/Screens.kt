@@ -412,13 +412,10 @@ fun SettingsList(viewModel: MainViewModel) {
     val includeDeviceModel by viewModel.settings.includeDeviceModel.collectAsStateWithLifecycle(initialValue = true)
     val webhookTimeout by viewModel.settings.webhookTimeout.collectAsStateWithLifecycle(initialValue = 8)
     val retryFailedWebhooks by viewModel.settings.retryFailedWebhooks.collectAsStateWithLifecycle(initialValue = true)
-    val webhookSecret by viewModel.settings.webhookSecretFlow.collectAsStateWithLifecycle()
     val preventScreenCapture by viewModel.settings.preventScreenCapture.collectAsStateWithLifecycle(initialValue = false)
-    val aesEncryptionKey by viewModel.settings.aesEncryptionKeyFlow.collectAsStateWithLifecycle()
     val customWebhookTemplate by viewModel.settings.customWebhookTemplate.collectAsStateWithLifecycle(initialValue = "")
     val enableSmsCommands by viewModel.settings.enableSmsCommands.collectAsStateWithLifecycle(initialValue = true)
     val captureRcs by viewModel.settings.captureRcs.collectAsStateWithLifecycle(initialValue = false)
-    val updateUrl by viewModel.settings.updateUrl.collectAsStateWithLifecycle(initialValue = "")
     val updateInfo by viewModel.updateInfo.collectAsStateWithLifecycle()
     val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsStateWithLifecycle()
     val updateStatus by viewModel.updateStatus.collectAsStateWithLifecycle()
@@ -669,9 +666,9 @@ fun SettingsList(viewModel: MainViewModel) {
                 ) {
                     Text("Webhook Secret Key (HMAC)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     Spacer(modifier = Modifier.height(16.dp))
-                    PersistedTextField(label = "Webhook HMAC secret", value = webhookSecret, onSave = { viewModel.updateWebhookSecret(it) }, secret = true, multiline = false, validate = { if (it.length > 4096) "Keep the secret under 4096 characters." else null })
+                    Text("Configured in this app. Cannot be changed.", style = MaterialTheme.typography.bodyMedium)
                     Spacer(modifier = Modifier.height(6.dp))
-                    Text("Adds an X-Signature HMAC-SHA256 header with webhook requests.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Signs webhook requests with HMAC-SHA256.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -689,7 +686,7 @@ fun SettingsList(viewModel: MainViewModel) {
                 ) {
                     Text("Message Encryption (AES-256-GCM)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     Spacer(modifier = Modifier.height(8.dp))
-                    PersistedTextField(label = "AES encryption password", value = aesEncryptionKey, onSave = { viewModel.updateAesEncryptionKey(it) }, secret = true, multiline = false, validate = { if (it.length > 4096) "Keep the secret under 4096 characters." else null })
+                    Text("Configured in this app. Cannot be changed.", style = MaterialTheme.typography.bodyMedium)
                     Spacer(modifier = Modifier.height(6.dp))
                     Text("Encrypts the message body before sending it to the webhook.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -784,9 +781,7 @@ fun SettingsList(viewModel: MainViewModel) {
                     Text("Updates", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     Text("Installed: ${com.example.BuildConfig.VERSION_NAME} (build ${com.example.BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(8.dp))
-                    PersistedTextField(label = "Update metadata URL", value = updateUrl, onSave = { viewModel.updateUpdateUrl(it) }, validate = {
-                        try { com.example.updater.UpdateMetadata.secureUrl(it); null } catch (_: Exception) { "Enter a valid HTTPS update URL." }
-                    })
+                    Text("Updates come from the official SMS Sync Pro GitHub releases.", style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     Button(

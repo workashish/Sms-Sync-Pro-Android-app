@@ -6,9 +6,9 @@ Android SMS and messaging-notification forwarding, with a companion dashboard. T
 
 Android 5.0/API 21 or newer is supported. This release compiles and targets API 35; emulator verification uses API 37. Direct APK distribution is supported; Google Play publishing is not part of this project.
 
-The installation defaults are in `app/src/main/assets/default_config.json`. They match the owner's requested configuration: forwarding, device model, webhook retries and SMS commands enabled; timeout 8 seconds; HMAC `YOUR_HMAC_SECRET_KEY`; AES `YOUR_AES_PASSWORD`; screenshots allowed; no template; one active `sms sync dashboard` rule targeting `https://thesms.vercel.app/api/webhooks/incoming`. Defaults are created once, and edits survive restarts and compatible upgrades.
+The installation defaults are in `app/src/main/assets/default_config.json`. They match the owner's requested configuration: forwarding, device model, webhook retries and SMS commands enabled; timeout 8 seconds; HMAC `YOUR_HMAC_SECRET_KEY`; AES `YOUR_AES_PASSWORD`; screenshots allowed; no template; one active `sms sync dashboard` rule targeting `https://thesms.vercel.app/api/webhooks/incoming`. Editable defaults are created once, and edits survive restarts and compatible upgrades. HMAC, AES and the official GitHub update URL are fixed by the APK; saved legacy overrides are reset and imported overrides are ignored.
 
-The supplied HMAC/AES strings are public placeholders, not unique production credentials. For a private deployment, choose unique values in Settings and set identical values on the dashboard server. Keeping the specified defaults was an explicit owner requirement; they are still embedded unchanged.
+The supplied HMAC/AES strings are public placeholders, not unique production credentials. For a private deployment, configure unique values in the packaged default_config.json, rebuild the APK and set identical values on the dashboard server. Keeping the specified defaults was an explicit owner requirement; they are still embedded unchanged.
 
 Grant SMS receipt permission to capture SMS. Send SMS permission is requested only for SMS targets. Notification access is required for messaging-notification capture. Outgoing SMS uses the selected SIM or Android's default SMS SIM; no ready/default SIM produces an actionable failure.
 
@@ -30,7 +30,7 @@ Queue processing recovers at app startup, boot and periodically. No indefinite f
 
 Logs are limited to 1,000 entries and a configurable 1–365-day retention period (default 30). Pending items are retained until completed/cancelled. Completed receipts are pruned after two days; completed outbox items follow retention. Cloud backup and device transfer are disabled because encrypted data depends on the original device's keys. Uninstalling clears local data; export configuration first if migrating.
 
-Imports validate the complete file before an atomic Room transaction merges settings and matching rules. Re-importing the same rules does not duplicate them. Exports omit HMAC/AES secrets, internal fingerprint keys and message history. Imports can explicitly supply secrets. Preserve those secrets separately when moving devices.
+Imports validate the complete file before an atomic Room transaction merges settings and matching rules. Re-importing the same rules does not duplicate them. Exports omit HMAC/AES secrets, internal fingerprint keys and message history. Imports cannot override the fixed HMAC, AES or update URL.
 
 Normal app closure is supported. Force-stop, revoked permissions, OEM battery restrictions, unvalidated/offline networks and platform OTP restrictions can delay or prevent capture/delivery. WorkManager does not guarantee instantaneous delivery under every device condition.
 
@@ -60,17 +60,9 @@ The companion server accepts up to 100 messages and 1 MB of request data. Reject
 
 ## Direct APK updates and signing
 
-Updates are checked against GitHub Releases or a custom HTTPS JSON URL. Metadata must include a SHA-256 digest (`digest` on GitHub assets, `sha256` for custom metadata). The app verifies checksum, package ID, increasing versionCode and compatible signer before offering installation. Downloaded files use app-specific storage. Installation starts from the explicit Settings button and Android may request approval for this app to install packages.
+Updates are checked against the fixed official GitHub Releases URL. The URL cannot be edited or changed through configuration imports. Metadata must include a SHA-256 digest (`digest` on GitHub assets). The app verifies checksum, package ID, increasing versionCode and compatible signer before offering installation. Downloaded files use app-specific storage. Installation starts from the explicit Settings button and Android may request approval for this app to install packages.
 
 A new persistent signing key was created locally because the original Google AI Studio key is unavailable. Future releases must reuse it. A differently signed older installation requires a one-time migration/reinstall; its original signing key cannot be recovered from the repository alone. Keep an encrypted offline backup of the protected signing folder. Never commit keystores or passwords.
-
-Custom update metadata:
-
-```json
-{"versionCode":5,"versionName":"2.2.1","downloadUrl":"https://example.com/app.apk","sha256":"64-hex-character-checksum","releaseNotes":"Changes"}
-```
-
-Debug-only local update fixtures may use HTTP on localhost/127.0.0.1/10.0.2.2. Release builds do not permit that exception.
 
 ## Build and checks
 
