@@ -29,13 +29,7 @@ object AppModule {
     @Provides
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
-        return Room.databaseBuilder(
-            context,
-            AppDatabase::class.java,
-            "sms_forwarder_database"
-        )
-        .fallbackToDestructiveMigration()
-        .build()
+        return AppDatabase.getDatabase(context)
     }
 
     @Provides
@@ -46,7 +40,7 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideSmsRepository(smsDao: SmsDao): SmsRepository {
-        return SmsRepository(smsDao)
+    fun provideSmsRepository(smsDao: SmsDao, vault: com.example.data.LocalVault, settings: com.example.data.SettingsDataStore): SmsRepository {
+        return SmsRepository(smsDao, vault, settings)
     }
 }

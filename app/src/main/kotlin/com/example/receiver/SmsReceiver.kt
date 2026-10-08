@@ -34,8 +34,7 @@ class SmsReceiver : BroadcastReceiver() {
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
         if (messages.isEmpty()) return
 
-        // Sort PDU parts by index to handle multipart SMS
-        messages.sortBy { it.indexOnIcc }
+        // Telephony returns multipart PDUs in delivery order; indexOnIcc is a SIM storage index.
 
         val hiltEntryPoint = EntryPointAccessors.fromApplication(context.applicationContext, SmsReceiverEntryPoint::class.java)
         val processor = hiltEntryPoint.messageProcessor()
@@ -47,7 +46,7 @@ class SmsReceiver : BroadcastReceiver() {
             try {
                 val sender = messages[0].displayOriginatingAddress ?: "Unknown"
                 val messageBody = messages.joinToString(separator = "") { it.messageBody ?: "" }
-                processor.processMessage(sender, messageBody)
+                processor.processMessage(sender, messageBody, messages[0].timestampMillis)
             } catch (e: Exception) {
                 Log.e("SmsReceiver", "Error processing SMS", e)
             } finally {

@@ -1,0 +1,22 @@
+{
+  "settings": {
+    "globalEnable": true,
+    "includeDeviceModel": true,
+    "retryFailedWebhooks": true,
+    "webhookTimeout": 8,
+    "webhookSecret": "YOUR_HMAC_SECRET_KEY",
+    "preventScreenCapture": false,
+    "aesEncryptionKey": "YOUR_AES_PASSWORD",
+    "customWebhookTemplate": "",
+    "enableSmsCommands": true
+  },
+  "rules": [
+    {
+      "name": "sms sync dashboard",
+      "type": "WEBHOOK",
+      "target": "https://thesms.vercel.app/api/webhooks/incoming",
+      "keywordFilter": "",
+      "isActive": true
+    }
+  ]
+}

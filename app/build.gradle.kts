@@ -4,20 +4,19 @@ plugins {
   kotlin("kapt")
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
-  alias(libs.plugins.secrets)
   alias(libs.plugins.hilt.android)
 }
 
 android {
   namespace = "com.example"
-  compileSdk = 34
+  compileSdk = 35
 
   defaultConfig {
     applicationId = "com.aistudio.smsforwarder.rndmxy.v2"
     minSdk = 21
-    targetSdk = 34
-    versionCode = 2
-    versionName = "2.0"
+    targetSdk = 35
+    versionCode = System.getenv("SMS_SYNC_VERSION_CODE")?.toIntOrNull() ?: 4
+    versionName = System.getenv("SMS_SYNC_VERSION_NAME") ?: "2.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -30,24 +29,20 @@ android {
       keyAlias = "upload"
       keyPassword = System.getenv("KEY_PASSWORD")
     }
-    create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
-    }
+
   }
 
   buildTypes {
+    debug {
+      if (System.getenv("SMS_SYNC_SIGNED_TEST") == "1") signingConfig = signingConfigs.getByName("release")
+    }
     release {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
-    debug {
-      signingConfig = signingConfigs.getByName("debugConfig")
-    }
+
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -63,16 +58,8 @@ android {
   testOptions { unitTests { isIncludeAndroidResources = true } }
 }
 
-// Configure the Secrets Gradle Plugin to use .env and .env.example files
-// to match the convention used in Web projects.
-secrets {
-  propertiesFileName = ".env"
-  defaultPropertiesFileName = ".env.example"
-}
-
-// Some unused dependencies are commented out below instead of being removed.
-// This makes it easy to add them back in the future if needed.
 dependencies {
+  implementation("com.google.re2j:re2j:1.8")
   implementation(platform(libs.androidx.compose.bom))
   implementation(libs.androidx.activity.compose)
   implementation(libs.androidx.compose.material.icons.core)
@@ -89,13 +76,9 @@ dependencies {
   implementation(libs.androidx.navigation.compose)
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
-  implementation(libs.converter.moshi)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
-  implementation(libs.logging.interceptor)
-  implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
-  implementation(libs.retrofit)
   
   implementation(libs.androidx.security.crypto)
   implementation(libs.hilt.android)
@@ -110,6 +93,7 @@ dependencies {
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(libs.robolectric)
+  androidTestImplementation("androidx.work:work-testing:2.9.1")
   androidTestImplementation(platform(libs.androidx.compose.bom))
   androidTestImplementation(libs.androidx.compose.ui.test.junit4)
   androidTestImplementation(libs.androidx.espresso.core)
@@ -118,5 +102,4 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
-  "ksp"(libs.moshi.kotlin.codegen)
 }

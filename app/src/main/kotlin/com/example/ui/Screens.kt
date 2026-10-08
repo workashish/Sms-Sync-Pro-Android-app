@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -23,6 +24,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -51,9 +54,26 @@ import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(viewModel: MainViewModel) {
-    var selectedTabIndex by remember { mutableStateOf(0) }
-    var showAddRuleDialog by remember { mutableStateOf(false) }
+fun MainScreen(viewModel: MainViewModel, initialTab: Int = 0) {
+    var selectedTabIndex by rememberSaveable { mutableStateOf(initialTab) }
+    var showAddRuleDialog by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    val notice by viewModel.notice.collectAsStateWithLifecycle()
+    val currentRules by viewModel.rules.collectAsStateWithLifecycle()
+    var editingId by rememberSaveable { mutableStateOf<Int?>(null) }
+    var pendingSmsRule by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
+    val smsPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val draft = pendingSmsRule
+        pendingSmsRule = arrayListOf()
+        if (granted && draft.size == 4) viewModel.addRule(draft[0], "SMS", draft[1], draft[2])
+        else if (!granted) viewModel.showNotice("Send SMS permission denied. The rule was not created.")
+    }
+    LaunchedEffect(notice) {
+        notice?.let {
+            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
+            viewModel.clearNotice()
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -114,17 +134,26 @@ fun MainScreen(viewModel: MainViewModel) {
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             when (selectedTabIndex) {
-                0 -> RulesList(viewModel)
+                0 -> RulesList(viewModel, onEdit = { editingId = it.id })
                 1 -> LogsList(viewModel)
                 2 -> SettingsList(viewModel)
             }
         }
 
+        currentRules.firstOrNull { it.id == editingId }?.let { rule ->
+            AddRuleDialog(initialRule = rule, onDismiss = { editingId = null }, onAdd = { name, type, target, filter ->
+                viewModel.editRule(rule.copy(name = name, type = type, target = target, keywordFilter = filter))
+                editingId = null
+            })
+        }
         if (showAddRuleDialog) {
             AddRuleDialog(
                 onDismiss = { showAddRuleDialog = false },
                 onAdd = { name, type, target, filter ->
-                    viewModel.addRule(name, type, target, filter)
+                    if (type == "SMS" && androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.SEND_SMS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        pendingSmsRule = arrayListOf(name, target, filter, "SMS")
+                        smsPermissionLauncher.launch(android.Manifest.permission.SEND_SMS)
+                    } else viewModel.addRule(name, type, target, filter)
                     showAddRuleDialog = false
                 }
             )
@@ -134,12 +163,14 @@ fun MainScreen(viewModel: MainViewModel) {
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-fun RulesList(viewModel: MainViewModel) {
+fun RulesList(viewModel: MainViewModel, onEdit: (ForwardingRule) -> Unit) {
     val rules by viewModel.rules.collectAsStateWithLifecycle()
+    val enabled by viewModel.settings.globalEnable.collectAsStateWithLifecycle(initialValue = true)
+    val queued by viewModel.queueCount.collectAsStateWithLifecycle()
 
     LazyColumn(contentPadding = PaddingValues(16.dp)) {
         item {
-            StatusHeroCard()
+            StatusHeroCard(enabled, rules.count { it.isActive }, queued)
             Spacer(modifier = Modifier.height(16.dp))
             SectionHeader(title = "Active Channels")
         }
@@ -154,7 +185,8 @@ fun RulesList(viewModel: MainViewModel) {
                 RuleItem(
                     rule = rule,
                     onToggle = { id, isActive -> viewModel.toggleRule(id, isActive) },
-                    onDelete = { viewModel.deleteRule(it) }
+                    onDelete = { viewModel.deleteRule(it) },
+                    onEdit = { onEdit(rule) }
                 )
                 Spacer(modifier = Modifier.height(12.dp))
             }
@@ -163,7 +195,7 @@ fun RulesList(viewModel: MainViewModel) {
 }
 
 @Composable
-fun StatusHeroCard() {
+fun StatusHeroCard(enabled: Boolean, activeRules: Int, queued: Int) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
@@ -177,7 +209,7 @@ fun StatusHeroCard() {
             Text("SERVICE STATUS", style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f))
             Spacer(modifier = Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-                Text("Active &\nMonitoring", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+                Text(if (!enabled) "Forwarding\nPaused" else if (activeRules == 0) "No Active\nRules" else "Forwarding\nEnabled", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
                 Box(
                     modifier = Modifier.size(48.dp).background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f), CircleShape),
                     contentAlignment = Alignment.Center
@@ -186,7 +218,7 @@ fun StatusHeroCard() {
                 }
             }
             Spacer(modifier = Modifier.height(20.dp))
-            Text("Your forwarding engine is running smoothly.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f))
+            Text(if (!enabled) "New forwarding is paused. $queued queued deliveries are retained." else if (activeRules == 0) "Add or enable a rule to forward messages." else "$activeRules active rule(s), $queued queued deliveries. Check Logs for results.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f))
         }
     }
 }
@@ -203,7 +235,7 @@ fun SectionHeader(title: String) {
 }
 
 @Composable
-fun RuleItem(rule: ForwardingRule, onToggle: (Int, Boolean) -> Unit, onDelete: (Int) -> Unit) {
+fun RuleItem(rule: ForwardingRule, onToggle: (Int, Boolean) -> Unit, onDelete: (Int) -> Unit, onEdit: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -248,6 +280,7 @@ fun RuleItem(rule: ForwardingRule, onToggle: (Int, Boolean) -> Unit, onDelete: (
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
+                TextButton(onClick = onEdit) { Text("Edit") }
                 TextButton(onClick = { onDelete(rule.id) }) {
                     Icon(Icons.Default.Delete, contentDescription = "Delete Rule", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
@@ -266,8 +299,8 @@ fun LogsList(viewModel: MainViewModel) {
 
     val filteredLogs = remember(logs, filterMode) {
         when (filterMode) {
-            "SUCCESS" -> logs.filter { it.status == "SUCCESS" }
-            "FAILED" -> logs.filter { it.status != "SUCCESS" }
+            "SUCCESS" -> logs.filter { it.status in setOf("SUCCESS", "SENT", "DELIVERED") }
+            "FAILED" -> logs.filter { it.status.startsWith("FAILED") || it.status.startsWith("UNKNOWN") }
             else -> logs
         }
     }
@@ -325,7 +358,7 @@ fun LogsList(viewModel: MainViewModel) {
 @Composable
 fun LogItem(log: SmsLog, isLast: Boolean) {
     val dateFormat = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
-    val isSuccess = log.status == "SUCCESS"
+    val isSuccess = log.status == "SUCCESS" || log.status == "DELIVERED"
     var expanded by remember { mutableStateOf(false) }
 
     Column(
@@ -360,7 +393,7 @@ fun LogItem(log: SmsLog, isLast: Boolean) {
                 Text(dateFormat.format(Date(log.timestamp)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f))
                 if (!isSuccess) {
                    Spacer(modifier = Modifier.height(4.dp))
-                   Text("FAILED", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                   Text(log.status.substringBefore(":").take(16), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = if (log.status.startsWith("FAILED")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
                 } else {
                    Spacer(modifier = Modifier.height(4.dp))
                    Icon(Icons.Default.CheckCircle, contentDescription = "Success", tint = com.example.ui.theme.SuccessGreen, modifier = Modifier.size(16.dp))
@@ -378,16 +411,55 @@ fun SettingsList(viewModel: MainViewModel) {
     val globalEnable by viewModel.settings.globalEnable.collectAsStateWithLifecycle(initialValue = true)
     val includeDeviceModel by viewModel.settings.includeDeviceModel.collectAsStateWithLifecycle(initialValue = true)
     val webhookTimeout by viewModel.settings.webhookTimeout.collectAsStateWithLifecycle(initialValue = 8)
-    val retryFailedWebhooks by viewModel.settings.retryFailedWebhooks.collectAsStateWithLifecycle(initialValue = false)
+    val retryFailedWebhooks by viewModel.settings.retryFailedWebhooks.collectAsStateWithLifecycle(initialValue = true)
     val webhookSecret by viewModel.settings.webhookSecretFlow.collectAsStateWithLifecycle()
     val preventScreenCapture by viewModel.settings.preventScreenCapture.collectAsStateWithLifecycle(initialValue = false)
     val aesEncryptionKey by viewModel.settings.aesEncryptionKeyFlow.collectAsStateWithLifecycle()
     val customWebhookTemplate by viewModel.settings.customWebhookTemplate.collectAsStateWithLifecycle(initialValue = "")
-    val enableSmsCommands by viewModel.settings.enableSmsCommands.collectAsStateWithLifecycle(initialValue = false)
+    val enableSmsCommands by viewModel.settings.enableSmsCommands.collectAsStateWithLifecycle(initialValue = true)
     val captureRcs by viewModel.settings.captureRcs.collectAsStateWithLifecycle(initialValue = false)
     val updateUrl by viewModel.settings.updateUrl.collectAsStateWithLifecycle(initialValue = "")
     val updateInfo by viewModel.updateInfo.collectAsStateWithLifecycle()
     val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsStateWithLifecycle()
+    val updateStatus by viewModel.updateStatus.collectAsStateWithLifecycle()
+    var readyUpdate by remember { mutableStateOf<String?>(null) }
+    var downloadNotice by remember { mutableStateOf<String?>(null) }
+    fun refreshReadyUpdate() {
+        val preferences = context.getSharedPreferences("updater", android.content.Context.MODE_PRIVATE)
+        if (preferences.getLong("ready_version", Long.MAX_VALUE) <= com.example.BuildConfig.VERSION_CODE) preferences.edit().remove("ready_uri").remove("ready_version").apply()
+        readyUpdate = preferences.getString("ready_uri", null)
+        downloadNotice = preferences.getString("download_error", null)
+    }
+    DisposableEffect(context) {
+        val preferences = context.getSharedPreferences("updater", android.content.Context.MODE_PRIVATE)
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> refreshReadyUpdate() }
+        preferences.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    fun installReadyUpdate() {
+        val uri = readyUpdate ?: return
+        scope.launch(Dispatchers.IO) {
+            try {
+                com.example.updater.ApkVerifier.verify(context, Uri.parse(uri), context.getSharedPreferences("updater", android.content.Context.MODE_PRIVATE).getString("expected_sha256", "") ?: "")
+                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                    context.startActivity(Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(Uri.parse(uri), "application/vnd.android.package-archive")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    })
+                }
+            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, e.message ?: "Unable to open installer. Please download the update again.", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+    val installPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (android.os.Build.VERSION.SDK_INT < 26 || context.packageManager.canRequestPackageInstalls()) installReadyUpdate()
+        else android.widget.Toast.makeText(context, "Allow update installation to continue.", android.widget.Toast.LENGTH_LONG).show()
+    }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { refreshReadyUpdate() }
+
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         uri?.let { 
@@ -423,7 +495,7 @@ fun SettingsList(viewModel: MainViewModel) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Enable App Forwarding", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                         Spacer(modifier = Modifier.height(2.dp))
-                        Text("Globally enable or disable all forwarding rules.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Pause new and queued forwarding. Resume keeps queued messages; in-flight deliveries may finish.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Switch(
@@ -541,7 +613,7 @@ fun SettingsList(viewModel: MainViewModel) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Prevent Screen Capture", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                         Spacer(modifier = Modifier.height(2.dp))
-                        Text("Block screenshots and hide app content in recent apps. (Requires app restart).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Block screenshots and hide app content in recent apps. Applies immediately.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Switch(
@@ -578,7 +650,7 @@ fun SettingsList(viewModel: MainViewModel) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Ignore Battery Optimization", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onTertiaryContainer)
                         Spacer(modifier = Modifier.height(2.dp))
-                        Text("Crucial for background reliability so Android doesn't kill the SMS service.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f))
+                        Text("Helps pending deliveries run while the screen is off. Device power settings can still affect scheduling.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f))
                     }
                 }
             }
@@ -597,16 +669,7 @@ fun SettingsList(viewModel: MainViewModel) {
                 ) {
                     Text("Webhook Secret Key (HMAC)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedTextField(
-                        value = webhookSecret,
-                        onValueChange = { 
-                            viewModel.updateWebhookSecret(it)
-                        },
-                        singleLine = true,
-                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                    PersistedTextField(label = "Webhook HMAC secret", value = webhookSecret, onSave = { viewModel.updateWebhookSecret(it) }, secret = true, multiline = false, validate = { if (it.length > 4096) "Keep the secret under 4096 characters." else null })
                     Spacer(modifier = Modifier.height(6.dp))
                     Text("Adds an X-Signature HMAC-SHA256 header with webhook requests.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -624,18 +687,9 @@ fun SettingsList(viewModel: MainViewModel) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(16.dp)
                 ) {
-                    Text("End-to-End Encryption (AES-256)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                    Text("Message Encryption (AES-256-GCM)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = aesEncryptionKey,
-                        onValueChange = { 
-                            viewModel.updateAesEncryptionKey(it)
-                        },
-                        singleLine = true,
-                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                    PersistedTextField(label = "AES encryption password", value = aesEncryptionKey, onSave = { viewModel.updateAesEncryptionKey(it) }, secret = true, multiline = false, validate = { if (it.length > 4096) "Keep the secret under 4096 characters." else null })
                     Spacer(modifier = Modifier.height(6.dp))
                     Text("Encrypts the message body before sending it to the webhook.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -655,18 +709,9 @@ fun SettingsList(viewModel: MainViewModel) {
                 ) {
                     Text("Custom Webhook Template", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = customWebhookTemplate,
-                        onValueChange = { 
-                            viewModel.updateCustomWebhookTemplate(it)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 3,
-                        maxLines = 10,
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                    PersistedTextField(label = "JSON webhook template", value = customWebhookTemplate, onSave = { viewModel.updateCustomWebhookTemplate(it) }, secret = false, multiline = true, validate = { if (it.isBlank()) null else try { org.json.JSONObject(it); null } catch (_: Exception) { "Enter a valid JSON object before saving." } })
                     Spacer(modifier = Modifier.height(6.dp))
-                    Text("Variables: {sender}, {message}, {device_model}. Leave empty for standard json payload.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Variables: {sender}, {message}, {body}, {device_model}, {id}, {timestamp}, {encryption}. Leave empty for the standard dashboard payload.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -687,7 +732,7 @@ fun SettingsList(viewModel: MainViewModel) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Enable SMS Commands", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                         Spacer(modifier = Modifier.height(2.dp))
-                        Text("Reply with Battery % and Network if you text 'STATUS' to this phone.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Reply to STATUS only from authorized numbers listed below. LOCATION/REBOOT are not supported.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Switch(
@@ -706,9 +751,9 @@ fun SettingsList(viewModel: MainViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Capture RCS Messages", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Capture Messaging Notifications", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                         Spacer(modifier = Modifier.height(2.dp))
-                        Text("Requires Notification Access permission. Captures incoming messages from default messaging apps.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Captures messaging notifications, including SMS/RCS. Summary notifications are skipped; matching cross-source messages are deduplicated. Android may hide sensitive content.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Switch(
@@ -737,6 +782,11 @@ fun SettingsList(viewModel: MainViewModel) {
                     modifier = Modifier.fillMaxWidth().padding(16.dp)
                 ) {
                     Text("Updates", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                    Text("Installed: ${com.example.BuildConfig.VERSION_NAME} (build ${com.example.BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    PersistedTextField(label = "Update metadata URL", value = updateUrl, onSave = { viewModel.updateUpdateUrl(it) }, validate = {
+                        try { com.example.updater.UpdateMetadata.secureUrl(it); null } catch (_: Exception) { "Enter a valid HTTPS update URL." }
+                    })
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     Button(
@@ -747,6 +797,19 @@ fun SettingsList(viewModel: MainViewModel) {
                         Text(if (isCheckingUpdate) "Checking..." else "Check for Updates")
                     }
 
+                    updateStatus?.let {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    downloadNotice?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
+                    readyUpdate?.let {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(onClick = {
+                            if (android.os.Build.VERSION.SDK_INT >= 26 && !context.packageManager.canRequestPackageInstalls()) {
+                                installPermissionLauncher.launch(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")))
+                            } else installReadyUpdate()
+                        }, modifier = Modifier.fillMaxWidth()) { Text("Install Downloaded Update") }
+                    }
                     updateInfo?.let { info ->
                         Spacer(modifier = Modifier.height(16.dp))
                         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
@@ -756,10 +819,10 @@ fun SettingsList(viewModel: MainViewModel) {
                                 Text(info.releaseNotes, style = MaterialTheme.typography.bodySmall)
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Button(
-                                    onClick = { viewModel.downloadUpdate(info.downloadUrl, info.versionName) },
+                                    onClick = { viewModel.downloadUpdate(info.downloadUrl, info.versionName, info.sha256) },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text("Download & Install")
+                                    Text("Download Update")
                                 }
                             }
                         }
@@ -767,6 +830,8 @@ fun SettingsList(viewModel: MainViewModel) {
                 }
             }
         }
+
+        item { PrivacyRoutingControls(viewModel) }
 
         item {
             Card(
@@ -779,6 +844,8 @@ fun SettingsList(viewModel: MainViewModel) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(16.dp)
                 ) {
+                    Text("Backups merge matching rules and settings atomically. HMAC/AES secrets and message history are excluded from exports.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text("Tools & Extras", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     Spacer(modifier = Modifier.height(16.dp))
                     
@@ -798,24 +865,7 @@ fun SettingsList(viewModel: MainViewModel) {
                                         android.widget.Toast.makeText(context, "Sending test to ${webhookRules.size} webhook(s)... check Logs tab.", android.widget.Toast.LENGTH_SHORT).show()
                                     }
                                     webhookRules.forEach { rule ->
-                                        val data = Data.Builder()
-                                            .putString("url", rule.target)
-                                            .putString("sender", "+12345678900")
-                                            .putString("message", "This is a test webhook sent from SMS Sync Pro.")
-                                            .putString("ruleName", "Test: ${rule.name}")
-                                            .putBoolean("isTest", true)
-                                            .build()
-
-                                        val constraints = Constraints.Builder()
-                                            .setRequiredNetworkType(NetworkType.CONNECTED)
-                                            .build()
-
-                                        val workRequest = OneTimeWorkRequestBuilder<WebhookWorker>()
-                                            .setConstraints(constraints)
-                                            .setInputData(data)
-                                            .build()
-
-                                        WorkManager.getInstance(context).enqueue(workRequest)
+                                        com.example.worker.QueueScheduler.test(context, rule)
                                     }
                                 }
                             }
@@ -912,15 +962,17 @@ fun SettingsList(viewModel: MainViewModel) {
 }
 
 @Composable
-fun AddRuleDialog(onDismiss: () -> Unit, onAdd: (String, String, String, String) -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf("SMS") } // "SMS" or "WEBHOOK"
-    var target by remember { mutableStateOf("") }
-    var keywordFilter by remember { mutableStateOf("") }
+fun AddRuleDialog(initialRule: ForwardingRule? = null, onDismiss: () -> Unit, onAdd: (String, String, String, String) -> Unit) {
+    var name by rememberSaveable { mutableStateOf(initialRule?.name ?: "") }
+    var type by rememberSaveable { mutableStateOf(initialRule?.type ?: "SMS") } // "SMS" or "WEBHOOK"
+    var target by rememberSaveable { mutableStateOf(initialRule?.target ?: "") }
+    var keywordFilter by rememberSaveable { mutableStateOf(initialRule?.keywordFilter ?: "") }
+
+    val validationError = com.example.data.RuleValidation.error(type, target, keywordFilter, com.example.BuildConfig.DEBUG)
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Forwarding Rule") },
+        title = { Text(if (initialRule == null) "Add Forwarding Rule" else "Edit Forwarding Rule") },
         text = {
             Column {
                 OutlinedTextField(
@@ -931,17 +983,19 @@ fun AddRuleDialog(onDismiss: () -> Unit, onAdd: (String, String, String, String)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(selected = type == "SMS", onClick = { 
-                        type = "SMS"
-                        if (target.startsWith("http")) target = "" 
-                    })
-                    Text("SMS Target")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    RadioButton(selected = type == "WEBHOOK", onClick = { 
-                        type = "WEBHOOK"
-                        if (target.isBlank()) target = "https://"
-                    })
-                    Text("Webhook Target")
+                    listOf("SMS" to "SMS Target", "WEBHOOK" to "Webhook Target").forEach { (option, label) ->
+                        Row(
+                            modifier = Modifier.weight(1f).selectable(selected = type == option, role = Role.RadioButton, onClick = {
+                                type = option
+                                if (option == "SMS" && target.startsWith("http")) target = ""
+                                if (option == "WEBHOOK" && target.isBlank()) target = "https://"
+                            }),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = type == option, onClick = null)
+                            Text(label, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
@@ -957,14 +1011,18 @@ fun AddRuleDialog(onDismiss: () -> Unit, onAdd: (String, String, String, String)
                     label = { Text("Filter (Text or /regex/i)") },
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (validationError != null && target.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(validationError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onAdd(name, type, target, keywordFilter) },
-                enabled = name.isNotBlank() && target.isNotBlank()
+                onClick = { onAdd(name.trim(), type, target.trim(), keywordFilter.trim()) },
+                enabled = name.isNotBlank() && validationError == null
             ) {
-                Text("Add Rule")
+                Text(if (initialRule == null) "Add Rule" else "Save Rule")
             }
         },
         dismissButton = {

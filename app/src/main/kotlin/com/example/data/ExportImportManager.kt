@@ -2,108 +2,46 @@ package com.example.data
 
 import android.content.Context
 import android.net.Uri
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.io.OutputStreamWriter
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
-import dagger.hilt.android.qualifiers.ApplicationContext
 
-class ExportImportManager @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val settings: SettingsDataStore,
-    private val smsDao: SmsDao
-) {
-
+class ExportImportManager @Inject constructor(@ApplicationContext private val context: Context,
+    private val settings: SettingsDataStore, private val dao: SmsDao) {
     suspend fun exportConfig(uri: Uri): Boolean = withContext(Dispatchers.IO) {
         try {
-            val rules = smsDao.getAllRulesNonFlow()
-
-            val root = JSONObject()
-            
-            val settingsJson = JSONObject().apply {
-                put("globalEnable", settings.globalEnable.first())
-                put("includeDeviceModel", settings.includeDeviceModel.first())
-                put("retryFailedWebhooks", settings.retryFailedWebhooks.first())
-                put("webhookTimeout", settings.webhookTimeout.first())
-                put("preventScreenCapture", settings.preventScreenCapture.first())
-                put("customWebhookTemplate", settings.customWebhookTemplate.first())
-                put("enableSmsCommands", settings.enableSmsCommands.first())
-            }
-            root.put("settings", settingsJson)
-
-            val rulesArray = JSONArray()
-            rules.forEach { rule ->
-                val ruleJson = JSONObject().apply {
-                    put("name", rule.name)
-                    put("type", rule.type)
-                    put("target", rule.target)
-                    put("keywordFilter", rule.keywordFilter)
-                    put("isActive", rule.isActive)
-                }
-                rulesArray.put(ruleJson)
-            }
-            root.put("rules", rulesArray)
-
-            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                OutputStreamWriter(outputStream).use { writer ->
-                    writer.write(root.toString(4))
-                }
-            }
+            val configuration = settings.snapshot().apply { remove("webhookSecret"); remove("aesEncryptionKey"); remove("_fingerprintKey") }
+            val rules = JSONArray()
+            dao.getAllRulesNonFlow().forEach { rule -> rules.put(JSONObject().put("name", rule.name).put("type", rule.type)
+                .put("target", rule.target).put("keywordFilter", rule.keywordFilter).put("isActive", rule.isActive)) }
+            val root = JSONObject().put("schema_version", 1).put("secretsIncluded", false).put("settings", configuration).put("rules", rules)
+            val output = context.contentResolver.openOutputStream(uri) ?: return@withContext false
+            output.bufferedWriter(Charsets.UTF_8).use { it.write(root.toString(2)) }
             true
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
+        } catch (e: CancellationException) { throw e } catch (_: Exception) { false }
     }
-
     suspend fun importConfig(uri: Uri): Boolean = withContext(Dispatchers.IO) {
         try {
-            val jsonString = context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                BufferedReader(InputStreamReader(inputStream)).use { reader ->
-                    reader.readText()
+            val input = context.contentResolver.openInputStream(uri) ?: return@withContext false
+            val bytes = input.use { stream ->
+                val out = java.io.ByteArrayOutputStream()
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val size = stream.read(buffer)
+                    if (size < 0) break
+                    require(out.size() + size <= 1024 * 1024) { "Configuration too large." }
+                    out.write(buffer, 0, size)
                 }
-            } ?: return@withContext false
-
-            val root = JSONObject(jsonString)
-
-            if (root.has("settings")) {
-                val settingsJson = root.getJSONObject("settings")
-                if (settingsJson.has("globalEnable")) settings.updateGlobalEnable(settingsJson.getBoolean("globalEnable"))
-                if (settingsJson.has("includeDeviceModel")) settings.updateIncludeDeviceModel(settingsJson.getBoolean("includeDeviceModel"))
-                if (settingsJson.has("retryFailedWebhooks")) settings.updateRetryFailedWebhooks(settingsJson.getBoolean("retryFailedWebhooks"))
-                if (settingsJson.has("webhookTimeout")) settings.updateWebhookTimeout(settingsJson.getInt("webhookTimeout"))
-                if (settingsJson.has("preventScreenCapture")) settings.updatePreventScreenCapture(settingsJson.getBoolean("preventScreenCapture"))
-                if (settingsJson.has("customWebhookTemplate")) settings.updateCustomWebhookTemplate(settingsJson.getString("customWebhookTemplate"))
-                if (settingsJson.has("enableSmsCommands")) settings.updateEnableSmsCommands(settingsJson.getBoolean("enableSmsCommands"))
+                out.toByteArray()
             }
-
-            if (root.has("rules")) {
-                val rulesArray = root.getJSONArray("rules")
-                for (i in 0 until rulesArray.length()) {
-                    val r = rulesArray.getJSONObject(i)
-                    if (!r.has("name") || !r.has("type") || !r.has("target")) {
-                        continue // Basic schema validation
-                    }
-                    smsDao.insertRule(
-                        ForwardingRule(
-                            name = r.optString("name", "Imported Rule"),
-                            type = r.optString("type", "WEBHOOK"),
-                            target = r.optString("target", ""),
-                            keywordFilter = r.optString("keywordFilter", ""),
-                            isActive = r.optBoolean("isActive", true)
-                        )
-                    )
-                }
-            }
+            val validated = ConfigImport.parse(bytes.toString(Charsets.UTF_8), com.example.BuildConfig.DEBUG)
+            settings.applyImport(validated.settings, validated.rules)
+            com.example.worker.QueueScheduler.recover(context, resume = true)
             true
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
+        } catch (e: CancellationException) { throw e } catch (_: Exception) { false }
     }
 }

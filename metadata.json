@@ -1,6 +1,6 @@
 {
   "name": "SMS Sync Pro",
-  "description": "Forward incoming SMS messages to phone numbers, webhooks, and email APIs with advanced keyword filtering and logging.",
+  "description": "Private Android SMS and messaging-notification forwarding with encrypted queues and a companion dashboard.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }

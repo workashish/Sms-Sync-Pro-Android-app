@@ -1,22 +1,14 @@
 package com.example.processor
 
 import android.content.Context
-import androidx.work.Constraints
-import androidx.work.Data
-import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
-import com.example.data.SettingsDataStore
-import com.example.data.SmsDao
-import com.example.data.SmsLog
-import com.example.worker.WebhookWorker
+import androidx.room.withTransaction
+import com.example.data.*
+import com.example.worker.QueueScheduler
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
+import org.json.JSONObject
+import java.security.MessageDigest
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,123 +16,72 @@ import javax.inject.Singleton
 class MessageProcessor @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settings: SettingsDataStore,
-    private val smsDao: SmsDao
+    private val dao: SmsDao,
+    private val db: AppDatabase,
+    private val vault: LocalVault
 ) {
-    suspend fun processMessage(sender: String, messageBody: String) {
-        val globalEnable = settings.globalEnable.first()
-        if (!globalEnable) return
-
-        val enableSmsCommands = settings.enableSmsCommands.first()
-        if (enableSmsCommands) {
-            val cmd = messageBody.trim().uppercase()
-            if (cmd == "STATUS") {
-                val batteryStatus = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
-                val level = batteryStatus?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
-                val scale = batteryStatus?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
-                val batteryPct = if (level != -1 && scale != -1) (level * 100 / scale.toFloat()).toInt() else -1
-                
-                val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as android.telephony.TelephonyManager
-                val networkName = try { telephonyManager.networkOperatorName } catch(e: Exception) { "Unknown" }
-                
-                val reply = "STATUS\nBattery: $batteryPct%\nNetwork: $networkName"
-                forwardViaSms(context, sender, reply)
-                
-                // Log command execution
-                smsDao.insertLog(SmsLog(sender = sender, message = cmd, ruleName = "SYSTEM COMMAND", target = sender, status = "SUCCESS"))
-                return
-            } else if (cmd == "REBOOT" || cmd == "LOCATION") {
-                val reply = "Command $cmd received but requires elevated permissions or root."
-                forwardViaSms(context, sender, reply)
-                smsDao.insertLog(SmsLog(sender = sender, message = cmd, ruleName = "SYSTEM COMMAND", target = sender, status = "FAILED: permission denied"))
-                return
-            }
+    suspend fun processMessage(sender: String, messageBody: String, timestamp: Long = System.currentTimeMillis(), source: String = "SMS", eventId: String? = null): String? {
+        if (!settings.globalEnable.first() || sender.isBlank() || messageBody.isBlank() || messageBody.startsWith(com.example.worker.SmsSendWorker.LOOP_MARKER)) return null
+        if (messageBody.toByteArray(Charsets.UTF_8).size > 262144) {
+            dao.insertLog(vault.protect(SmsLog(sender = sender, message = "[Oversized message body omitted]", ruleName = "Capture", target = "", status = "FAILED: text exceeds the supported 256 KB size")))
+            return null
         }
-
-        val activeRules = smsDao.getActiveRules()
-        
-        // We run the rules processing in parallel
-        kotlinx.coroutines.coroutineScope {
-            activeRules.forEach { rule ->
-                launch {
-                    val keyword = rule.keywordFilter.trim()
-                if (keyword.isNotEmpty()) {
-                    val isMatch = if (keyword.startsWith("/") && (keyword.endsWith("/") || keyword.endsWith("/i"))) {
-                        try {
-                            val ignoreCase = keyword.endsWith("/i")
-                            val regexPattern = if (ignoreCase) keyword.drop(1).dropLast(2) else keyword.drop(1).dropLast(1)
-                            val regex = if (ignoreCase) Regex(regexPattern, RegexOption.IGNORE_CASE) else Regex(regexPattern)
-                            withTimeoutOrNull(1000) {
-                                regex.containsMatchIn(sender) || regex.containsMatchIn(messageBody)
-                            } ?: false
-                        } catch (e: Exception) {
-                            messageBody.contains(keyword, ignoreCase = true) || sender.contains(keyword, ignoreCase = true)
-                        }
-                    } else {
-                        messageBody.contains(keyword, ignoreCase = true) || sender.contains(keyword, ignoreCase = true)
-                    }
-                    
-                    if (!isMatch) return@launch
-                }
-
-                if (rule.type == "SMS") {
-                    var status = "SUCCESS"
-                    try {
-                        forwardViaSms(context, rule.target, "$sender:\n$messageBody")
-                    } catch (e: Exception) {
-                        status = "FAILED: ${e.message?.take(50)}"
-                    }
-                    smsDao.insertLog(
-                        SmsLog(
-                            sender = sender,
-                            message = messageBody,
-                            ruleName = rule.name,
-                            target = rule.target,
-                            status = status
-                        )
-                    )
-                } else if (rule.type == "WEBHOOK") {
-                    val data = Data.Builder()
-                        .putString("url", rule.target)
-                        .putString("sender", sender)
-                        .putString("message", messageBody)
-                        .putString("ruleName", rule.name)
-                        .putBoolean("isTest", false)
-                        .build()
-
-                    val constraints = Constraints.Builder()
-                        .setRequiredNetworkType(NetworkType.CONNECTED)
-                        .build()
-
-                    val workRequest = OneTimeWorkRequestBuilder<WebhookWorker>()
-                        .setConstraints(constraints)
-                        .setInputData(data)
-                        .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 1, java.util.concurrent.TimeUnit.MINUTES)
-                        .build()
-
-                    WorkManager.getInstance(context).enqueueUniqueWork(
-                        "webhook_${rule.id}_${System.currentTimeMillis()}",
-                        androidx.work.ExistingWorkPolicy.APPEND_OR_REPLACE,
-                        workRequest
-                    )
-                }
-            }
+        val hash = fingerprint(messageBody)
+        val event = fingerprint(eventId ?: "$source|$sender|$messageBody|$timestamp")
+        val id = UUID.nameUUIDFromBytes(event.toByteArray(Charsets.UTF_8)).toString()
+        val inserted = db.withTransaction {
+            // Cross-source equality only; repeated real SMS have independent event IDs.
+            if (dao.crossSourceDuplicate(hash, source, timestamp - 90000, timestamp + 90000) > 0) false
+            else dao.insertReceipt(Receipt(id, event, hash, source, timestamp,
+                vault.encrypt(JSONObject().put("sender", sender).put("message", messageBody).toString()))) != -1L
         }
+        if (inserted) QueueScheduler.receipt(context, id)
+        return dao.receipt(id)?.id
     }
-}
-    
-    private fun forwardViaSms(context: Context, target: String, message: String) {
-        val smsManager = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            context.getSystemService(android.telephony.SmsManager::class.java)
+    suspend fun route(receipt: Receipt) {
+        val payload = JSONObject(vault.decrypt(receipt.payload))
+        val sender = payload.getString("sender")
+        val message = payload.getString("message")
+        val authorized = settings.authorizedCommandSenders.first().split(',', '\n', ';').map { normalizePhone(it) }.filter { it.isNotEmpty() }
+        val command = message.trim().uppercase(java.util.Locale.ROOT)
+        val commandsEnabled = settings.enableSmsCommands.first()
+        db.withTransaction {
+        if (dao.receipt(receipt.id)?.processed != false) return@withTransaction
+        if (commandsEnabled && normalizePhone(sender) in authorized && command == "STATUS") {
+            val battery = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+            val level = battery?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = battery?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
+            val percentage = if (level >= 0 && scale > 0) "${level * 100 / scale}%" else "Unknown"
+            val response = "SMS Sync Pro STATUS\nBattery: $percentage\nPending deliveries: ${dao.pendingOutbox().size}"
+            enqueue(receipt, -1, "SMS", sender, response, "Authorized STATUS", sender)
         } else {
-            @Suppress("DEPRECATION")
-            android.telephony.SmsManager.getDefault()
+            dao.getActiveRules().forEach { rule ->
+                val error = RuleValidation.error(rule.type, rule.target, rule.keywordFilter, com.example.BuildConfig.DEBUG)
+                if (error != null) {
+                    dao.insertLog(vault.protect(SmsLog(sender = sender, message = message, ruleName = rule.name, target = rule.target, status = "FAILED: $error")))
+                    return@forEach
+                }
+                if (SafeFilter.matches(rule.keywordFilter, sender, message))
+                    enqueue(receipt, rule.id, rule.type, sender, message, rule.name, rule.target)
+            }
         }
-        
-        val parts = smsManager.divideMessage(message)
-        if (parts.size > 1) {
-            smsManager.sendMultipartTextMessage(target, null, parts, null, null)
-        } else {
-            smsManager.sendTextMessage(target, null, message, null, null)
+        dao.markProcessed(receipt.id)
         }
+        dao.pendingForReceipt(receipt.id).forEach { QueueScheduler.delivery(context, it) }
+    }
+    private suspend fun enqueue(receipt: Receipt, ruleId: Int, type: String, sender: String, body: String, ruleName: String, target: String) {
+        val id = UUID.nameUUIDFromBytes("${receipt.id}|$ruleId|$type".toByteArray(Charsets.UTF_8)).toString()
+        val json = JSONObject().put("sender", sender).put("message", body).put("url", target).put("ruleName", ruleName)
+        dao.insertOutbox(Outbox(id, receipt.id, type, vault.encrypt(json.toString()), receipt.receivedAt))
+    }
+    suspend fun fingerprint(value: String): String {
+        val key = android.util.Base64.decode(settings.snapshot().getString("_fingerprintKey"), android.util.Base64.NO_WRAP)
+        val mac = javax.crypto.Mac.getInstance("HmacSHA256")
+        mac.init(javax.crypto.spec.SecretKeySpec(key, "HmacSHA256"))
+        return mac.doFinal(value.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it.toInt() and 255) }
+    }
+    companion object {
+        fun normalizePhone(value: String) = value.filter { it.isDigit() }.takeIf { it.length in 3..15 } ?: ""
+        fun hash(value: String) = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it.toInt() and 255) }
     }
 }

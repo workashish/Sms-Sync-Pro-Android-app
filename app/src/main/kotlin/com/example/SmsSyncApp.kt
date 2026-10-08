@@ -10,6 +10,11 @@ import javax.inject.Inject
 class SmsSyncApp : Application(), Configuration.Provider {
     @Inject lateinit var workerFactory: HiltWorkerFactory
 
+    override fun onCreate() {
+        super.onCreate()
+        com.example.worker.QueueScheduler.initialize(this)
+    }
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)

@@ -1,17 +1,17 @@
 package com.example.data
 
 import android.content.Context
-import android.content.SharedPreferences
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import org.json.JSONObject
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,26 +20,98 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "se
 @Singleton
 class SettingsDataStore @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val dataStore: DataStore<Preferences>
+    private val dataStore: DataStore<Preferences>,
+    private val dao: SmsDao,
+    private val vault: LocalVault
 ) {
-    private val masterKey = MasterKey.Builder(context)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
-
-    private val securePrefs: SharedPreferences = EncryptedSharedPreferences.create(
-        context,
-        "secure_settings",
-        masterKey,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
-
-    private val _webhookSecretFlow = MutableStateFlow(securePrefs.getString("webhook_secret", null) ?: "YOUR_HMAC_SECRET_KEY")
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mutex = Mutex()
+    private val defaults = DefaultConfig.load(context).getJSONObject("settings").apply {
+        put("captureRcs", false); put("updateUrl", "https://api.github.com/repos/workashish/Sms-Sync-Pro-Android-app/releases/latest")
+        put("authorizedCommandSenders", ""); put("smsSubscriptionId", -1); put("retentionDays", 30)
+    }
+    private val _webhookSecretFlow = MutableStateFlow(defaults.getString("webhookSecret"))
     val webhookSecretFlow = _webhookSecretFlow.asStateFlow()
-
-    private val _aesEncryptionKeyFlow = MutableStateFlow(securePrefs.getString("aes_encryption_key", null) ?: "YOUR_AES_PASSWORD")
+    private val _aesEncryptionKeyFlow = MutableStateFlow(defaults.getString("aesEncryptionKey"))
     val aesEncryptionKeyFlow = _aesEncryptionKeyFlow.asStateFlow()
-
+    init { scope.launch { ensureConfig() } }
+    private suspend fun ensureConfig() = mutex.withLock {
+        if (dao.getConfig() == null) {
+            val json = JSONObject(defaults.toString()).put("_fingerprintKey", randomFingerprintKey())
+            val old = dataStore.data.first()
+            val booleans = mapOf("globalEnable" to GLOBAL_ENABLE, "includeDeviceModel" to INCLUDE_DEVICE_MODEL,
+                "retryFailedWebhooks" to RETRY_FAILED_WEBHOOKS, "preventScreenCapture" to PREVENT_SCREEN_CAPTURE,
+                "enableSmsCommands" to ENABLE_SMS_COMMANDS, "captureRcs" to CAPTURE_RCS)
+            booleans.forEach { (name, key) -> old[key]?.let { json.put(name, it) } }
+            old[WEBHOOK_TIMEOUT]?.let { json.put("webhookTimeout", it.coerceIn(1, 60)) }
+            old[CUSTOM_WEBHOOK_TEMPLATE]?.let { json.put("customWebhookTemplate", it) }
+            old[UPDATE_URL]?.let { json.put("updateUrl", it) }
+            // Legacy encrypted preferences only existed on API 23+. New storage also supports API 21/22.
+            if (android.os.Build.VERSION.SDK_INT >= 23) {
+                val master = MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
+                val legacy = EncryptedSharedPreferences.create(context, "secure_settings", master,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV, EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM)
+                legacy.getString("webhook_secret", null)?.let { json.put("webhookSecret", it) }
+                legacy.getString("aes_encryption_key", null)?.let { json.put("aesEncryptionKey", it) }
+                dao.saveConfig(AppConfig(payload = vault.encrypt(json.toString())))
+                legacy.edit().clear().commit()
+            } else dao.saveConfig(AppConfig(payload = vault.encrypt(json.toString())))
+            dataStore.edit { it.clear() }
+        } else {
+            val existing = JSONObject(vault.decrypt(dao.getConfig()!!.payload))
+            if (!existing.has("_fingerprintKey")) dao.saveConfig(AppConfig(payload = vault.encrypt(existing.put("_fingerprintKey", randomFingerprintKey()).toString())))
+        }
+    }
+    private fun randomFingerprintKey(): String = android.util.Base64.encodeToString(ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }, android.util.Base64.NO_WRAP)
+    private val config = dao.observeConfig().filterNotNull().map { JSONObject(vault.decrypt(it.payload)) }.onEach {
+        _webhookSecretFlow.value = it.optString("webhookSecret", defaults.getString("webhookSecret"))
+        _aesEncryptionKeyFlow.value = it.optString("aesEncryptionKey", defaults.getString("aesEncryptionKey"))
+    }
+    suspend fun snapshot(): JSONObject { ensureConfig(); return JSONObject(vault.decrypt(dao.getConfig()!!.payload)) }
+    private suspend fun set(name: String, value: Any) { ensureConfig(); mutex.withLock {
+        val json = JSONObject(vault.decrypt(dao.getConfig()!!.payload)).put(name, value)
+        dao.saveConfig(AppConfig(payload = vault.encrypt(json.toString())))
+        if (name == "webhookSecret") _webhookSecretFlow.value = value.toString()
+        if (name == "aesEncryptionKey") _aesEncryptionKeyFlow.value = value.toString()
+    } }
+    suspend fun applyImport(values: JSONObject, rules: List<ForwardingRule>) { ensureConfig(); mutex.withLock {
+        val json = JSONObject(vault.decrypt(dao.getConfig()!!.payload))
+        values.keys().forEach { json.put(it, values.get(it)) }
+        dao.importAtomically(AppConfig(payload = vault.encrypt(json.toString())), rules)
+        _webhookSecretFlow.value = json.getString("webhookSecret")
+        _aesEncryptionKeyFlow.value = json.getString("aesEncryptionKey")
+    } }
+    private fun boolean(name: String): Flow<Boolean> = config.map { it.optBoolean(name, defaults.optBoolean(name)) }
+    private fun string(name: String): Flow<String> = config.map { it.optString(name, defaults.optString(name)) }
+    val globalEnable = boolean("globalEnable")
+    val includeDeviceModel = boolean("includeDeviceModel")
+    val retryFailedWebhooks = boolean("retryFailedWebhooks")
+    val preventScreenCapture = boolean("preventScreenCapture")
+    val enableSmsCommands = boolean("enableSmsCommands")
+    val captureRcs = boolean("captureRcs")
+    val webhookTimeout: Flow<Int> = config.map { it.optInt("webhookTimeout", 8).coerceIn(1, 60) }
+    val customWebhookTemplate = string("customWebhookTemplate")
+    val updateUrl = string("updateUrl")
+    val authorizedCommandSenders = string("authorizedCommandSenders")
+    val smsSubscriptionId: Flow<Int> = config.map { it.optInt("smsSubscriptionId", -1) }
+    val retentionDays: Flow<Int> = config.map { it.optInt("retentionDays", 30).coerceIn(1, 365) }
+    suspend fun updateGlobalEnable(value: Boolean) { set("globalEnable", value); if (value) com.example.worker.QueueScheduler.recover(context, resume = true) }
+    suspend fun retryFailedWebhooksNow() { dao.retryFailedWebhooks(); com.example.worker.QueueScheduler.recover(context, resume = true) }
+    suspend fun updateIncludeDeviceModel(value: Boolean) = set("includeDeviceModel", value)
+    suspend fun updateWebhookTimeout(value: Int) = set("webhookTimeout", value.coerceIn(1, 60))
+    suspend fun updateRetryFailedWebhooks(value: Boolean) = set("retryFailedWebhooks", value)
+    suspend fun updatePreventScreenCapture(value: Boolean) = set("preventScreenCapture", value)
+    suspend fun updateCustomWebhookTemplate(value: String) = set("customWebhookTemplate", value)
+    suspend fun updateEnableSmsCommands(value: Boolean) = set("enableSmsCommands", value)
+    suspend fun updateCaptureRcs(value: Boolean) = set("captureRcs", value)
+    suspend fun updateUpdateUrl(value: String) = set("updateUrl", value)
+    suspend fun updateAuthorizedCommandSenders(value: String) = set("authorizedCommandSenders", value)
+    suspend fun updateSmsSubscriptionId(value: Int) = set("smsSubscriptionId", value)
+    suspend fun updateRetentionDays(value: Int) = set("retentionDays", value.coerceIn(1, 365))
+    suspend fun updateWebhookSecret(value: String) = set("webhookSecret", value)
+    suspend fun updateAesEncryptionKey(value: String) = set("aesEncryptionKey", value)
+    fun getWebhookSecret(): String = _webhookSecretFlow.value
+    fun getAesEncryptionKey(): String = _aesEncryptionKeyFlow.value
     companion object {
         val GLOBAL_ENABLE = booleanPreferencesKey("global_enable")
         val INCLUDE_DEVICE_MODEL = booleanPreferencesKey("include_device_model")
@@ -51,63 +123,4 @@ class SettingsDataStore @Inject constructor(
         val CAPTURE_RCS = booleanPreferencesKey("capture_rcs")
         val UPDATE_URL = stringPreferencesKey("update_url")
     }
-
-    val globalEnable: Flow<Boolean> = dataStore.data.map { it[GLOBAL_ENABLE] ?: true }
-    val includeDeviceModel: Flow<Boolean> = dataStore.data.map { it[INCLUDE_DEVICE_MODEL] ?: true }
-    val webhookTimeout: Flow<Int> = dataStore.data.map { it[WEBHOOK_TIMEOUT] ?: 8 }
-    val retryFailedWebhooks: Flow<Boolean> = dataStore.data.map { it[RETRY_FAILED_WEBHOOKS] ?: false }
-    val preventScreenCapture: Flow<Boolean> = dataStore.data.map { it[PREVENT_SCREEN_CAPTURE] ?: false }
-    val customWebhookTemplate: Flow<String> = dataStore.data.map { it[CUSTOM_WEBHOOK_TEMPLATE] ?: "" }
-    val enableSmsCommands: Flow<Boolean> = dataStore.data.map { it[ENABLE_SMS_COMMANDS] ?: false }
-    val captureRcs: Flow<Boolean> = dataStore.data.map { it[CAPTURE_RCS] ?: false }
-    val updateUrl: Flow<String> = dataStore.data.map { it[UPDATE_URL] ?: "https://api.github.com/repos/workashish/Sms-Sync-Pro-Android-app/releases/latest" }
-
-    suspend fun updateGlobalEnable(value: Boolean) {
-        dataStore.edit { it[GLOBAL_ENABLE] = value }
-    }
-
-    suspend fun updateIncludeDeviceModel(value: Boolean) {
-        dataStore.edit { it[INCLUDE_DEVICE_MODEL] = value }
-    }
-
-    suspend fun updateWebhookTimeout(value: Int) {
-        dataStore.edit { it[WEBHOOK_TIMEOUT] = value }
-    }
-
-    suspend fun updateRetryFailedWebhooks(value: Boolean) {
-        dataStore.edit { it[RETRY_FAILED_WEBHOOKS] = value }
-    }
-
-    suspend fun updatePreventScreenCapture(value: Boolean) {
-        dataStore.edit { it[PREVENT_SCREEN_CAPTURE] = value }
-    }
-
-    suspend fun updateCustomWebhookTemplate(value: String) {
-        dataStore.edit { it[CUSTOM_WEBHOOK_TEMPLATE] = value }
-    }
-
-    suspend fun updateEnableSmsCommands(value: Boolean) {
-        dataStore.edit { it[ENABLE_SMS_COMMANDS] = value }
-    }
-
-    suspend fun updateCaptureRcs(value: Boolean) {
-        dataStore.edit { it[CAPTURE_RCS] = value }
-    }
-
-    suspend fun updateUpdateUrl(value: String) {
-        dataStore.edit { it[UPDATE_URL] = value }
-    }
-
-    fun updateWebhookSecret(value: String) {
-        securePrefs.edit().putString("webhook_secret", value).apply()
-        _webhookSecretFlow.value = value
-    }
-
-    fun updateAesEncryptionKey(value: String) {
-        securePrefs.edit().putString("aes_encryption_key", value).apply()
-        _aesEncryptionKeyFlow.value = value
-    }
-
-    fun getWebhookSecret(): String = securePrefs.getString("webhook_secret", null) ?: "YOUR_HMAC_SECRET_KEY"
-    fun getAesEncryptionKey(): String = securePrefs.getString("aes_encryption_key", null) ?: "YOUR_AES_PASSWORD"
 }

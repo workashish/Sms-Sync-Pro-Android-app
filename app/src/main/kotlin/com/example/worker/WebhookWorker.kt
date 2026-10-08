@@ -13,15 +13,13 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
 import org.json.JSONObject
-import java.io.OutputStreamWriter
+import kotlinx.coroutines.CancellationException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.Mac
-import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
-import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 @HiltWorker
@@ -29,108 +27,80 @@ class WebhookWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
     private val settings: SettingsDataStore,
-    private val smsDao: SmsDao
+    private val smsDao: SmsDao,
+    private val vault: com.example.data.LocalVault
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
-        val urlString = inputData.getString("url") ?: return Result.failure()
-        val sender = inputData.getString("sender") ?: return Result.failure()
-        val message = inputData.getString("message") ?: return Result.failure()
-        val ruleName = inputData.getString("ruleName") ?: "Manual Test"
-        val isTest = inputData.getBoolean("isTest", false)
-        
-        val includeDeviceModel = settings.includeDeviceModel.first()
+        val queued = inputData.getString("outboxId")?.let { smsDao.outbox(it) }
+        if (queued != null && queued.status != "PENDING") return Result.success()
+        val payload = queued?.let { JSONObject(vault.decrypt(it.payload)) }
+        val urlString = payload?.getString("url") ?: inputData.getString("url") ?: return Result.failure()
+        val sender = payload?.getString("sender") ?: inputData.getString("sender") ?: return Result.failure()
+        val message = payload?.getString("message") ?: inputData.getString("message") ?: return Result.failure()
+        val ruleName = payload?.optString("ruleName") ?: inputData.getString("ruleName") ?: "Manual Test"
+        val isTest = queued?.isTest ?: inputData.getBoolean("isTest", false)
+        val config = settings.snapshot()
+        if (!isTest && !config.getBoolean("globalEnable")) return Result.retry()
+        val messageId = queued?.id ?: id.toString()
+        val includeDeviceModel = config.getBoolean("includeDeviceModel")
         val deviceModel = if (includeDeviceModel) Build.MODEL else "Unknown"
-        val timeout = settings.webhookTimeout.first() * 1000
-        val retryFailed = settings.retryFailedWebhooks.first()
-        val customTemplate = settings.customWebhookTemplate.first()
-        val aesEncryptionKey = settings.getAesEncryptionKey()
-        val webhookSecret = settings.getWebhookSecret()
+        val timeout = config.getInt("webhookTimeout").coerceIn(1, 60) * 1000
+        val retryFailed = config.getBoolean("retryFailedWebhooks")
+        val customTemplate = config.getString("customWebhookTemplate")
+        val aesEncryptionKey = config.getString("aesEncryptionKey")
+        val webhookSecret = config.getString("webhookSecret")
+        val receivedAt = (queued?.timestamp ?: inputData.getLong("timestamp", 0)).takeIf { it > 0 } ?: System.currentTimeMillis()
+        val encryption = if (aesEncryptionKey.isEmpty()) "none" else "aes-256-gcm-pbkdf2-sha256-v1"
 
         var success = false
         var exceptionMsg = ""
+        var retryable = true
 
+        queued?.let { smsDao.attempt(it.id, System.currentTimeMillis()) }
         try {
             success = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 var finalUrlString = urlString
-                if (!finalUrlString.startsWith("https://")) {
-                    if (finalUrlString.startsWith("http://")) {
-                        throw IllegalArgumentException("Only HTTPS is supported for Webhooks")
-                    }
-                    finalUrlString = "https://$finalUrlString"
+                if (!finalUrlString.contains("://")) finalUrlString = "https://$finalUrlString"
+                val parsedUrl = URL(finalUrlString)
+                require(parsedUrl.protocol == "https" || (com.example.BuildConfig.DEBUG && parsedUrl.protocol == "http")) {
+                    "Only HTTPS is supported for Webhooks"
                 }
-                val url = URL(finalUrlString)
-                val connection = url.openConnection() as HttpURLConnection
-                connection.requestMethod = "POST"
-                connection.setRequestProperty("Content-Type", "application/json")
-                connection.setRequestProperty("Accept", "application/json")
-                connection.setRequestProperty("User-Agent", "SmsForwarder/1.0")
-                connection.connectTimeout = timeout
-                connection.readTimeout = timeout
-                connection.doOutput = true
-
                 var finalMessage = message
                 if (aesEncryptionKey.isNotEmpty()) {
                     finalMessage = encryptAesGcm(message, aesEncryptionKey)
                 }
 
                 val jsonOutput = if (customTemplate.isNotBlank()) {
-                    val jsonObj = try { JSONObject(customTemplate) } catch(e: Exception) { JSONObject() }
-                    
-                    val keys = jsonObj.keys()
-                    while(keys.hasNext()) {
-                        val k = keys.next()
-                        val v = jsonObj.optString(k)
-                        if (v.contains("{sender}")) jsonObj.put(k, v.replace("{sender}", sender))
-                        if (v.contains("{message}")) jsonObj.put(k, v.replace("{message}", finalMessage))
-                        if (v.contains("{body}")) jsonObj.put(k, v.replace("{body}", finalMessage))
-                        if (v.contains("{device_model}")) jsonObj.put(k, v.replace("{device_model}", deviceModel))
-                    }
-                    if (jsonObj.length() == 0) {
-                        customTemplate
-                            .replace("{sender}", JSONObject.quote(sender).removeSurrounding("\""))
-                            .replace("{message}", JSONObject.quote(finalMessage).removeSurrounding("\""))
-                            .replace("{body}", JSONObject.quote(finalMessage).removeSurrounding("\""))
-                            .replace("{device_model}", JSONObject.quote(deviceModel).removeSurrounding("\""))
-                    } else {
-                        jsonObj.toString()
+                    WebhookPayload.renderTemplate(customTemplate, sender, finalMessage, deviceModel, messageId, receivedAt, encryption).let { rendered ->
+                        if (parsedUrl.path.endsWith("/api/webhooks/incoming")) {
+                            val objectPayload = JSONObject(rendered)
+                            require(objectPayload.optString("sender") == sender && objectPayload.optString("body") == finalMessage) { "Dashboard templates must include sender and body placeholders." }
+                            objectPayload.put("id", messageId).put("schema_version", 1).put("encryption", encryption).put("timestamp", receivedAt).toString()
+                        } else rendered
                     }
                 } else {
-                    val lowerMsg = message.lowercase()
-                    val isOtpWord = lowerMsg.contains("code") || lowerMsg.contains("otp") || lowerMsg.contains("2fa") || lowerMsg.contains("verification")
-                    val isBankWord = lowerMsg.contains("bank") || lowerMsg.contains("alert") || lowerMsg.contains("deposit") || lowerMsg.contains("payment") || lowerMsg.contains("account") || lowerMsg.contains("card") || lowerMsg.contains("debited") || lowerMsg.contains("credited") || lowerMsg.contains("emi") || lowerMsg.contains("balance") || lowerMsg.contains("due")
-
-                    val type = when {
-                        isOtpWord -> "otp"
-                        isBankWord -> "bank"
-                        else -> "message"
-                    }
-                    
+                    val parsed = com.example.processor.MessageClassification.parse(message)
+                    val type = parsed.type
                     JSONObject().apply {
+                        put("id", messageId)
+                        put("schema_version", 1)
+                        put("encryption", if (aesEncryptionKey.isEmpty()) "none" else "aes-256-gcm-pbkdf2-sha256-v1")
                         put("type", type)
                         put("sender", sender)
                         put("body", finalMessage)
-                        put("time", java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault()).format(java.util.Date(System.currentTimeMillis())))
+                        put("timestamp", receivedAt)
+                        put("time", java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
+                            timeZone = java.util.TimeZone.getTimeZone("UTC")
+                        }.format(java.util.Date(receivedAt)))
                         
-                        val metaObj = JSONObject()
-                        if (type == "otp") {
-                            val codeMatcher = Regex("\\b\\d{4,8}\\b|G-\\d{6}").find(message)
-                            if (codeMatcher != null) {
-                                metaObj.put("code", codeMatcher.value)
-                            }
-                        } else if (type == "bank") {
-                            if (lowerMsg.contains("deposit") || lowerMsg.contains("credited")) {
-                                metaObj.put("bank_type", "DEPOSIT")
-                            } else {
-                                metaObj.put("bank_type", "PAYMENT")
-                            }
-                            val amountMatcher = Regex("\\$?\\s*\\d+(?:,\\d{3})*(?:\\.\\d{2})?").find(message)
-                            if (amountMatcher != null) {
-                                metaObj.put("amount", amountMatcher.value.replace("$", "").trim())
-                            }
-                        }
+                        val metaObj = com.example.processor.MessageClassification.metadata(parsed, aesEncryptionKey.isNotEmpty())
                         if (includeDeviceModel) {
                             metaObj.put("device_model", deviceModel)
+                        }
+                        if (aesEncryptionKey.isNotEmpty()) {
+                            metaObj.remove("code")
+                            metaObj.remove("amount")
                         }
                         if (metaObj.length() > 0) {
                             put("metadata", metaObj)
@@ -138,91 +108,58 @@ class WebhookWorker @AssistedInject constructor(
                     }.toString().replace("\\/", "/")
                 }
 
-                if (webhookSecret.isNotEmpty()) {
-                    val signature = generateHmacSha256(jsonOutput, webhookSecret)
-                    if (signature.isNotEmpty()) {
-                        connection.setRequestProperty("x-hmac-signature", signature)
-                    }
-                }
-
-                val jsonBytes = jsonOutput.toByteArray(Charsets.UTF_8)
-                connection.setRequestProperty("Content-Length", jsonBytes.size.toString())
-                connection.outputStream.write(jsonBytes)
-                connection.outputStream.flush()
-                connection.outputStream.close()
-
-                val responseCode = connection.responseCode
-                var isSuccess = false
-                if (responseCode in 200..299) {
-                    isSuccess = true
-                } else {
-                    val errorStream = connection.errorStream
-                    var errorBody = errorStream?.bufferedReader()?.use { it.readText() }?.trim() ?: ""
-                    
-                    if (errorBody.contains("<html", ignoreCase = true) || errorBody.contains("<!doctype", ignoreCase = true)) {
-                        errorBody = "Server returned HTML page instead of API response. Please check if your Webhook URL is correct."
-                    } else if (errorBody.length > 250) {
-                        errorBody = errorBody.take(250) + "..."
-                    }
-                    
-                    val statusText = when (responseCode) {
-                        404 -> "404 Not Found (Check URL)"
-                        401 -> "401 Unauthorized (Check HMAC/AES Secret)"
-                        400 -> "400 Bad Request"
-                        else -> "$responseCode"
-                    }
-                    exceptionMsg = "HTTP Error: $statusText - $errorBody"
-                }
-                connection.disconnect()
-                isSuccess
+                val signature = if (webhookSecret.isNotEmpty()) generateHmacSha256(jsonOutput, webhookSecret) else ""
+                val response = WebhookTransport.send(finalUrlString, jsonOutput, signature, messageId, timeout.toLong())
+                retryable = response.status == 408 || response.status == 429 || response.status in 500..599
+                if (response.status !in 200..299) exceptionMsg = "HTTP ${response.status}: ${response.error}"
+                response.status in 200..299
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
+            retryable = e is java.io.IOException
             exceptionMsg = e.message ?: "Unknown Error"
         }
 
         if (!isTest) {
             if (success) {
                 smsDao.insertLog(
-                    SmsLog(sender = sender, message = message, ruleName = ruleName, target = urlString, status = "SUCCESS")
+                    vault.protect(SmsLog(sender = sender, message = message, ruleName = ruleName, target = urlString, status = "SUCCESS"))
                 )
+                queued?.let { smsDao.outboxStatus(it.id, "SUCCESS") }
                 return Result.success()
             } else {
-                if (runAttemptCount < 3 && retryFailed) {
+                if ((queued?.attempts ?: runAttemptCount) < 3 && retryFailed && retryable) {
+                    smsDao.insertLog(vault.protect(SmsLog(sender = sender, message = message, ruleName = ruleName, target = urlString, status = "RETRYING: $exceptionMsg")))
                     return Result.retry()
                 } else {
                     smsDao.insertLog(
-                        SmsLog(sender = sender, message = message, ruleName = ruleName, target = urlString, status = "FAILED: $exceptionMsg")
+                        vault.protect(SmsLog(sender = sender, message = message, ruleName = ruleName, target = urlString, status = "FAILED: $exceptionMsg"))
                     )
+                    queued?.let { smsDao.outboxStatus(it.id, "FAILED") }
                     return Result.failure()
                 }
             }
         } else {
             smsDao.insertLog(
-                SmsLog(sender = sender, message = message, ruleName = ruleName, target = urlString, status = if (success) "SUCCESS" else "FAILED: $exceptionMsg")
+                vault.protect(SmsLog(sender = sender, message = message, ruleName = ruleName, target = urlString, status = if (success) "SUCCESS" else "FAILED: $exceptionMsg"))
             )
+            queued?.let { smsDao.outboxStatus(it.id, if (success) "SUCCESS" else "FAILED") }
             return if (success) Result.success() else Result.failure(Data.Builder().putString("error", exceptionMsg).build())
         }
     }
 
     private fun generateHmacSha256(data: String, key: String): String {
-        return try {
-            val mac = Mac.getInstance("HmacSHA256")
-            val secretKeySpec = SecretKeySpec(key.toByteArray(Charsets.UTF_8), "HmacSHA256")
-            mac.init(secretKeySpec)
-            val hmacBytes = mac.doFinal(data.toByteArray(Charsets.UTF_8))
-            hmacBytes.joinToString("") { "%02x".format(it.toInt() and 0xFF) }
-        } catch (e: Exception) {
-            ""
-        }
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(key.toByteArray(Charsets.UTF_8), "HmacSHA256"))
+        return mac.doFinal(data.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it.toInt() and 0xFF) }
     }
 
     private fun encryptAesGcm(data: String, key: String): String {
         // PBKDF2 with HMAC-SHA256
         val salt = ByteArray(16)
         SecureRandom().nextBytes(salt)
-        val spec = PBEKeySpec(key.toCharArray(), salt, 10000, 256)
-        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-        val secretKey = SecretKeySpec(factory.generateSecret(spec).encoded, "AES")
+        val secretKey = SecretKeySpec(WebhookCrypto.deriveKey(key, salt), "AES")
 
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         val iv = ByteArray(12)

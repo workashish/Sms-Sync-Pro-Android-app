@@ -38,7 +38,10 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.Lifecycle
-import com.example.service.SmsForegroundService
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
+import android.view.WindowManager
 import com.example.ui.MainScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.MainViewModel
@@ -52,6 +55,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         
         enableEdgeToEdge()
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.settings.preventScreenCapture.collect { secure ->
+                    if (secure) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                }
+            }
+        }
 
         val requestPermissionLauncher = registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
@@ -63,20 +74,15 @@ class MainActivity : ComponentActivity() {
                     PermissionsWrapper(
                         onRequestPermissions = {
                             val perms = mutableListOf(
-                                Manifest.permission.RECEIVE_SMS,
-                                Manifest.permission.READ_SMS,
-                                Manifest.permission.SEND_SMS
+                                Manifest.permission.RECEIVE_SMS
                             )
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                 perms.add(Manifest.permission.POST_NOTIFICATIONS)
                             }
-                            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
-                                perms.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                            }
                             requestPermissionLauncher.launch(perms.toTypedArray())
                         }
                     ) {
-                        MainScreen(viewModel = viewModel)
+                        MainScreen(viewModel = viewModel, initialTab = if (intent.getBooleanExtra("open_settings", false)) 2 else 0)
                     }
                 }
             }
@@ -93,23 +99,26 @@ fun PermissionsWrapper(onRequestPermissions: () -> Unit, content: @Composable ()
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED) 
     }
     var batteryOptimized by remember { 
-        mutableStateOf(pm?.isIgnoringBatteryOptimizations(context.packageName) == false) 
+        mutableStateOf(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && pm?.isIgnoringBatteryOptimizations(context.packageName) == false)
     }
-    var skipBatteryOpt by remember { mutableStateOf(false) }
+    val setupPreferences = context.getSharedPreferences("setup", Context.MODE_PRIVATE)
+    var skipBatteryOpt by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(setupPreferences.getBoolean("battery_prompt_dismissed", false)) }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         permissionsGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
-        batteryOptimized = pm?.isIgnoringBatteryOptimizations(context.packageName) == false
+        batteryOptimized = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && pm?.isIgnoringBatteryOptimizations(context.packageName) == false
     }
 
-    if (!permissionsGranted) {
+    var continueWithoutSms by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    if (!permissionsGranted && !continueWithoutSms) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
-                Text("SMS Sync Pro needs SMS & Notification permissions to run in the background gracefully.", textAlign = TextAlign.Center)
+                Text("Grant SMS receipt permission to capture incoming SMS. Send SMS permission is requested only for SMS targets.", textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = onRequestPermissions) {
                     Text("Grant Permissions")
                 }
+                TextButton(onClick = { continueWithoutSms = true }) { Text("Continue to Settings") }
             }
         }
     } else if (batteryOptimized && !skipBatteryOpt) {
@@ -130,12 +139,14 @@ fun PermissionsWrapper(onRequestPermissions: () -> Unit, content: @Composable ()
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
+                    setupPreferences.edit().putBoolean("battery_prompt_dismissed", true).apply()
                     skipBatteryOpt = true
                 }) {
                     Text("Disable Battery Optimization")
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 TextButton(onClick = { 
+                    setupPreferences.edit().putBoolean("battery_prompt_dismissed", true).apply()
                     skipBatteryOpt = true
                 }) {
                     Text("Skip for now")
